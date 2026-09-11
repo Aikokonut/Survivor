@@ -239,10 +239,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -323,8 +323,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -1.91, y: -7.05, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -661,10 +661,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -745,8 +745,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.08, y: -3.09, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -870,10 +870,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -954,8 +954,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.83, y: -5.53, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1079,10 +1079,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -1163,8 +1163,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.61, y: -7.49, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1425,10 +1425,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -1509,8 +1509,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.27, y: -3.26, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1718,10 +1718,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -1802,8 +1802,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.61, y: -7.49, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1927,10 +1927,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -2011,8 +2011,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.48, y: -6.47, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2136,10 +2136,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -2220,8 +2220,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.08, y: -3.09, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2424,10 +2424,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -2508,8 +2508,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.04, y: -3.76, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2735,10 +2735,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -2819,8 +2819,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.38, y: -5.23, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2944,10 +2944,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -3028,8 +3028,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.03, y: -5.89, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -3291,10 +3291,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -3375,8 +3375,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.04, y: -3.76, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -3500,10 +3500,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -3584,8 +3584,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.97, y: -4.4, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -3709,10 +3709,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -3793,8 +3793,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.8323808, y: -6.968301, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -3918,10 +3918,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -4002,8 +4002,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.574955, y: -6.470231, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4127,10 +4127,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -4211,8 +4211,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -1.27, y: -6, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4336,10 +4336,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -4420,8 +4420,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.38, y: -5.23, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4641,10 +4641,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -4725,8 +4725,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -1.91, y: -7.05, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4850,10 +4850,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -4934,8 +4934,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.574955, y: -6.470231, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -5059,10 +5059,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -5143,8 +5143,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.36, y: -4.08, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -5268,10 +5268,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -5352,8 +5352,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.8323808, y: -6.968301, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -5477,10 +5477,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -5561,8 +5561,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -1.91, y: -7.05, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -5779,10 +5779,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -5863,8 +5863,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.97, y: -4.4, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -6034,10 +6034,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -6118,8 +6118,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.27, y: -3.26, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -6243,10 +6243,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -6327,8 +6327,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.4372716, y: -6.055174, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -6452,10 +6452,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -6536,8 +6536,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.25, y: -3.65, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -6661,10 +6661,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -6745,8 +6745,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.25, y: -3.65, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -6870,10 +6870,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -6954,8 +6954,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -1.27, y: -6, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7079,10 +7079,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -7163,8 +7163,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.83, y: -5.53, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7288,10 +7288,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -7372,8 +7372,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.4372716, y: -6.055174, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7497,10 +7497,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -7581,8 +7581,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.48, y: -6.47, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7706,10 +7706,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -7790,8 +7790,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.03, y: -5.89, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7915,10 +7915,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -7999,8 +7999,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.88, y: -4.81, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -8124,10 +8124,10 @@ MonoBehaviour:
   obstacleAvoidWeight: 1.4
   groundCheckRadius: 0.12
   fallGraceTime: 0.22
-  offGroundSepScale: 0.35
   carefulLeaveSpeed: 1.8
   walkBobAmplitude: 0.035
   walkBobSpeed: 16
+  walkBobAngle: 10
   groundMask:
     serializedVersion: 2
     m_Bits: 64
@@ -8208,8 +8208,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.88, y: -4.81, z: -1}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
