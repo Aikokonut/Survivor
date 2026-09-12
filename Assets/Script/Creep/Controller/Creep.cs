@@ -15,12 +15,13 @@ public class Creep : MonoBehaviour
     [SerializeField] private float yieldLaneWidth = 0.55f;
     [SerializeField] private float obstacleCheckDistance = 0.55f;
     [SerializeField] private float obstacleAvoidWeight = 1.4f;
-    [SerializeField] private float groundCheckRadius = 0.18f;
-    [SerializeField] private float fallGraceTime = 0.12f;
-    [SerializeField] private float carefulLeaveSpeed = 1.8f;
-    [SerializeField] private float walkBobAmplitude = 0.12f;
+    [SerializeField] private float groundCheckRadius = 0.05f;
+    [SerializeField] private float fallGraceTime = 0.06f;
+    [SerializeField] private float carefulLeaveSpeed = 1.6f;
+    [SerializeField] private float catchUpDistance = 1.4f;
+    [SerializeField] private float catchUpBoost = 1.75f;
+    [SerializeField] private float walkBobAmplitude = 10f;
     [SerializeField] private float walkBobSpeed = 22f;
-    [SerializeField] private float walkBobAngle = 10f;
     [SerializeField] private LayerMask groundMask;
     [SerializeField] private LayerMask abyssMask;
     [SerializeField] private LayerMask obstacleMask;
@@ -33,61 +34,45 @@ public class Creep : MonoBehaviour
     private Vector2 _desired;
     private Vector2 _seek;
     private Vector2 _separation;
-    private Vector2 _nextPosition;
+    private Vector2 _groupTarget;
     private Vector3 _baseScale;
+    private Vector3 _baseEuler;
     private Vector3 _fallScale;
     private readonly Collider2D[] _groundHits = new Collider2D[1];
-    private readonly RaycastHit2D[] _obstacleHits = new RaycastHit2D[1];
+    private readonly RaycastHit2D[] _obstacleHits = new RaycastHit2D[4];
+    private readonly RaycastHit2D[] _slideHits = new RaycastHit2D[4];
     private ContactFilter2D _groundFilter;
     private ContactFilter2D _obstacleFilter;
-    private float _speedScale;
-    private float _accelScale;
+    private float _speedScale = 1f;
+    private float _accelScale = 1f;
     private float _airTime;
     private float _bobPhase;
     private float _moveIntent;
-    private float _bobLogTimer;
     private bool _isGrounded;
     private bool _isFalling;
     private bool _configured;
-    private static int _debugFallLogs;
+    private bool _hasGroundMask;
+    private bool _hasObstacleMask;
+    private bool _groundChecked;
+    private bool _evenSpacingMovement;
 
     private void Awake()
     {
-        CacheReferences();
-    }
+        if (groundCheckRadius > 0.08f) groundCheckRadius = 0.05f;
+        if (fallGraceTime > 0.08f) fallGraceTime = 0.06f;
 
-    private void CacheReferences()
-    {
         _transform = transform;
         _baseScale = _transform.localScale;
+        _baseEuler = _transform.localEulerAngles;
         _fallScale = _baseScale;
-        _formationOffset = Vector2.zero;
-        _velocity = Vector2.zero;
-        _desired = Vector2.zero;
-        _seek = Vector2.zero;
-        _separation = Vector2.zero;
-        _nextPosition = Vector2.zero;
-        _speedScale = 1f;
-        _accelScale = 1f;
-        _airTime = 0f;
         _bobPhase = Mathf.Abs(GetInstanceID() % 628) * 0.01f;
-        _bobLogTimer = 0f;
-        _moveIntent = 0f;
-        walkBobAmplitude = 0.12f;
-        walkBobSpeed = 22f;
-        walkBobAngle = 10f;
-        _isGrounded = false;
-        _isFalling = false;
-        _configured = false;
+        _hasGroundMask = groundMask.value != 0;
+        _hasObstacleMask = obstacleMask.value != 0;
 
-        _groundFilter = new ContactFilter2D();
-        _groundFilter.useTriggers = true;
-        _groundFilter.useLayerMask = true;
+        _groundFilter = new ContactFilter2D { useTriggers = true, useLayerMask = true };
         _groundFilter.SetLayerMask(groundMask);
 
-        _obstacleFilter = new ContactFilter2D();
-        _obstacleFilter.useTriggers = false;
-        _obstacleFilter.useLayerMask = true;
+        _obstacleFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
         _obstacleFilter.SetLayerMask(obstacleMask);
 
         if (body != null)
@@ -97,7 +82,7 @@ public class Creep : MonoBehaviour
             body.gravityScale = 0f;
             body.linearVelocity = Vector2.zero;
             body.angularVelocity = 0f;
-            body.constraints = RigidbodyConstraints2D.FreezeRotation;
+            body.constraints = RigidbodyConstraints2D.None;
         }
     }
 
@@ -128,260 +113,159 @@ public class Creep : MonoBehaviour
         float dt,
         Vector2 groupTarget,
         Vector2 flowForward,
+        Vector2 moveInput,
         float formationScale,
         Vector2[] positions,
         int count,
         int selfIndex,
         float separationRadius,
         float separationWeight,
-        float moveIntent)
+        float moveIntent,
+        bool evenSpacingMovement = true)
     {
-        if (_isFalling)
+        if (_isFalling) { TickFallScale(dt); return; }
+        if (!_configured) return;
+
+        if (!_groundChecked)
         {
-            TickFallScale(dt);
-            return;
+            _isGrounded = IsOnGround(_transform.position);
+            _groundChecked = true;
         }
 
-        if (!_configured)
+        if (_hasGroundMask && !_isGrounded)
         {
+            _velocity = Vector2.zero;
+            UpdateFallState(dt);
             return;
         }
 
         _moveIntent = moveIntent;
-        UpdateGroundedState();
-        IntegrateMotion(
-            dt,
-            groupTarget,
-            flowForward,
-            formationScale,
-            positions,
-            count,
-            selfIndex,
-            separationRadius,
-            separationWeight);
-        UpdateFallState(dt);
+        _groupTarget = groupTarget;
+        _evenSpacingMovement = evenSpacingMovement;
+
+        Vector2 position = _transform.position;
+        BuildDesiredVelocity(position, groupTarget, flowForward, moveInput, formationScale, positions, count, selfIndex, separationRadius, separationWeight, evenSpacingMovement);
+        ApplyObstacleAvoidance(position);
+        AccelerateTowardDesired(dt);
+        ApplyMovement(position, dt);
         ApplyWalkBob();
-    }
-
-    private void UpdateGroundedState()
-    {
-        if (groundMask.value == 0)
-        {
-            _isGrounded = true;
-            _airTime = 0f;
-            return;
-        }
-
-        _isGrounded = IsOnGround(_transform.position);
-        if (_isGrounded)
-        {
-            _airTime = 0f;
-        }
     }
 
     private bool IsOnGround(Vector2 position)
     {
-        if (groundMask.value == 0)
-        {
-            return true;
-        }
-
-        _groundFilter.SetLayerMask(groundMask);
-        int hitCount = Physics2D.OverlapCircle(
-            position,
-            groundCheckRadius,
-            _groundFilter,
-            _groundHits);
-        return hitCount > 0;
+        return !_hasGroundMask || Physics2D.OverlapCircle(position, groundCheckRadius, _groundFilter, _groundHits) > 0;
     }
 
     private void UpdateFallState(float dt)
     {
-        if (groundMask.value == 0)
-        {
-            return;
-        }
-
-        if (_isGrounded)
-        {
-            _airTime = 0f;
-            return;
-        }
-
+        if (!_hasGroundMask || _isGrounded) { _airTime = 0f; return; }
         _airTime += dt;
-        if (_airTime < fallGraceTime)
-        {
-            return;
-        }
-
-        // #region agent log
-        if (_debugFallLogs < 30)
-        {
-            _debugFallLogs++;
-            Vector2 p = _transform.position;
-            try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix4\",\"hypothesisId\":\"A\",\"location\":\"Creep.cs:UpdateFallState\",\"message\":\"grace leave-ground fall\",\"data\":{\"name\":\"" + name + "\",\"px\":" + p.x.ToString("R") + ",\"py\":" + p.y.ToString("R") + ",\"vx\":" + _velocity.x.ToString("R") + ",\"vy\":" + _velocity.y.ToString("R") + ",\"spd\":" + _velocity.magnitude.ToString("R") + ",\"airTime\":" + _airTime.ToString("R") + ",\"moveIntent\":" + _moveIntent.ToString("R") + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
-        }
-        // #endregion
-        BeginFall();
-    }
-
-    private void IntegrateMotion(
-        float dt,
-        Vector2 groupTarget,
-        Vector2 flowForward,
-        float formationScale,
-        Vector2[] positions,
-        int count,
-        int selfIndex,
-        float separationRadius,
-        float separationWeight)
-    {
-        Vector2 position = _transform.position;
-        BuildDesiredVelocity(
-            position,
-            groupTarget,
-            flowForward,
-            formationScale,
-            positions,
-            count,
-            selfIndex,
-            separationRadius,
-            separationWeight);
-        ApplyObstacleAvoidance(position);
-        AccelerateTowardDesired(dt);
-        ApplyMovement(position, dt);
+        if (_airTime >= fallGraceTime) BeginFall();
     }
 
     private void BuildDesiredVelocity(
         Vector2 position,
         Vector2 groupTarget,
         Vector2 flowForward,
+        Vector2 moveInput,
         float formationScale,
         Vector2[] positions,
         int count,
         int selfIndex,
         float separationRadius,
-        float separationWeight)
+        float separationWeight,
+        bool evenSpacingMovement)
     {
-        float personalMax = maxSpeed * _speedScale;
-        float compress = 1f - formationScale;
-        if (compress < 0f)
+        float effectiveSpeedScale = evenSpacingMovement ? 1f : _speedScale;
+        float personalMax = maxSpeed * effectiveSpeedScale;
+        bool moving = _moveIntent > 0.05f;
+        _seek = Vector2.zero;
+        _separation = Vector2.zero;
+
+        float sideX = -flowForward.y;
+        float sideY = flowForward.x;
+        Vector2 side = new Vector2(sideX, sideY);
+        float lateral = (position.x - groupTarget.x) * sideX + (position.y - groupTarget.y) * sideY;
+
+        ApplySeparation(position, positions, count, selfIndex, separationRadius, separationWeight, personalMax);
+
+        if (!moving)
         {
-            compress = 0f;
+            if (evenSpacingMovement)
+            {
+                Vector2 idleSlot = groupTarget + _formationOffset;
+                Vector2 toIdleSlot = idleSlot - position;
+                _seek = Vector2.ClampMagnitude(toIdleSlot * (slotFollowWeight * 1.0f), personalMax * 0.45f);
+                _desired = _seek + _separation;
+                return;
+            }
+
+            float stopPushLimit = personalMax * 0.45f;
+            float sepSqr = _separation.sqrMagnitude;
+            if (sepSqr > stopPushLimit * stopPushLimit && sepSqr > 0.0001f)
+            {
+                _separation *= (stopPushLimit / Mathf.Sqrt(sepSqr));
+            }
+            float bridgeHold = lateral * (1f - formationScale) * 0.65f;
+            _desired = _separation - side * bridgeHold;
+            return;
         }
 
-        float ox = _formationOffset.x * formationScale;
-        float oy = _formationOffset.y * formationScale;
-        ResolveSlotOnGround(groupTarget, ref ox, ref oy);
+        float compress = Mathf.Max(0f, 1f - formationScale);
 
-        float slotX = groupTarget.x + ox;
-        float slotY = groupTarget.y + oy;
-
-        if (formationScale < 0.45f)
+        if (evenSpacingMovement)
         {
-            float queueRank = EstimateQueueRank(position, groupTarget, flowForward, positions, count, selfIndex);
-            float queuePull = (1f - formationScale / 0.45f);
-            slotX -= flowForward.x * queueRank * queueSpacing * queuePull;
-            slotY -= flowForward.y * queueRank * queueSpacing * queuePull;
+            Vector2 moveSlot = groupTarget + _formationOffset;
+            Vector2 toMoveSlot = moveSlot - position;
+            _seek = Vector2.ClampMagnitude(toMoveSlot * (slotFollowWeight * 1.0f), personalMax * 0.45f);
+
+            _desired = moveInput * personalMax + _seek + _separation;
+
+            Vector2 toGroup = groupTarget - position;
+            float toGroupSqr = toGroup.sqrMagnitude;
+            float farBehindDist = catchUpDistance * 2.2f;
+            if (toGroupSqr > farBehindDist * farBehindDist)
+            {
+                _desired += toGroup * (personalMax * 0.4f / Mathf.Sqrt(toGroupSqr));
+            }
+            return;
         }
 
-        float toSlotX = slotX - position.x;
-        float toSlotY = slotY - position.y;
-        float seekSqr = toSlotX * toSlotX + toSlotY * toSlotY;
+        personalMax *= (1f + _moveIntent * 0.35f);
 
-        _seek.x = 0f;
-        _seek.y = 0f;
-        _separation.x = 0f;
-        _separation.y = 0f;
+        float rawLat = _formationOffset.x * sideX + _formationOffset.y * sideY;
+        float rawAlong = _formationOffset.x * flowForward.x + _formationOffset.y * flowForward.y;
+        float latOff = rawLat * formationScale;
+        float alongOff = rawAlong * Mathf.Lerp(1f, 2.5f, compress) - rawLat * (compress * 1.2f);
+        Vector2 slot = groupTarget + side * latOff + flowForward * alongOff;
+
+        Vector2 toSlot = slot - position;
+        Vector2 toTarget = groupTarget - position;
+        float blend = Mathf.Lerp(0.15f, 0.35f, compress);
+        Vector2 seek = Vector2.Lerp(toSlot, toTarget, blend);
+        float seekSqr = seek.sqrMagnitude;
 
         if (seekSqr > 0.0001f)
         {
             float dist = Mathf.Sqrt(seekSqr);
-            float speed = personalMax;
-            float arrive = Mathf.Lerp(0.25f, arriveRadius * 0.75f, formationScale);
-            if (dist < arrive)
-            {
-                speed *= dist / arrive;
-            }
-
-            float inv = (speed / dist) * slotFollowWeight;
-            _seek.x = toSlotX * inv;
-            _seek.y = toSlotY * inv;
+            float arrive = Mathf.Lerp(0.2f, arriveRadius * 0.65f, formationScale) * 0.35f;
+            float speed = dist < arrive ? personalMax * Mathf.Max(0.7f, dist / Mathf.Max(arrive, 0.05f)) : personalMax;
+            _seek = seek * ((speed / dist) * slotFollowWeight * (0.55f + _moveIntent * 0.55f));
         }
 
-        ApplySeparation(position, positions, count, selfIndex, separationRadius, separationWeight, personalMax);
-        if (formationScale < 0.45f)
+        float funnelLegacy = Mathf.Clamp(lateral * 1.5f, -1f, 1f) * (personalMax * 0.4f * compress);
+        Vector2 funnelForce = side * funnelLegacy;
+        _seek -= funnelForce;
+
+        float driveScaleLegacy = Mathf.Lerp(0.55f, 1f, formationScale);
+        _desired = moveInput * (personalMax * driveScaleLegacy) + _seek * 0.65f + _separation;
+
+        Vector2 toGroupLegacy = groupTarget - position;
+        float toGroupLegacySqr = toGroupLegacy.sqrMagnitude;
+        if (toGroupLegacySqr > catchUpDistance * catchUpDistance)
         {
-            ApplyYield(position, groupTarget, flowForward, positions, count, selfIndex);
+            _desired += toGroupLegacy * (catchUpBoost * personalMax / Mathf.Sqrt(toGroupLegacySqr));
         }
-
-        _desired.x = _seek.x + _separation.x;
-        _desired.y = _seek.y + _separation.y;
-    }
-
-    private void ResolveSlotOnGround(Vector2 groupTarget, ref float ox, ref float oy)
-    {
-        if (groundMask.value == 0)
-        {
-            return;
-        }
-
-        Vector2 slot;
-        slot.x = groupTarget.x + ox;
-        slot.y = groupTarget.y + oy;
-        if (IsOnGround(slot))
-        {
-            return;
-        }
-
-        for (int i = 0; i < 5; i++)
-        {
-            ox *= 0.55f;
-            oy *= 0.55f;
-            slot.x = groupTarget.x + ox;
-            slot.y = groupTarget.y + oy;
-            if (IsOnGround(slot))
-            {
-                return;
-            }
-        }
-
-        ox = 0f;
-        oy = 0f;
-    }
-
-    private float EstimateQueueRank(
-        Vector2 position,
-        Vector2 groupTarget,
-        Vector2 flowForward,
-        Vector2[] positions,
-        int count,
-        int selfIndex)
-    {
-        if (positions == null || count <= 0)
-        {
-            return 0f;
-        }
-
-        float myAlong = (groupTarget.x - position.x) * flowForward.x + (groupTarget.y - position.y) * flowForward.y;
-        float rank = 0f;
-
-        for (int i = 0; i < count; i++)
-        {
-            if (i == selfIndex)
-            {
-                continue;
-            }
-
-            float along = (groupTarget.x - positions[i].x) * flowForward.x
-                + (groupTarget.y - positions[i].y) * flowForward.y;
-            if (along < myAlong)
-            {
-                rank += 1f;
-            }
-        }
-
-        return rank;
     }
 
     private void ApplySeparation(
@@ -393,314 +277,215 @@ public class Creep : MonoBehaviour
         float separationWeight,
         float personalMax)
     {
-        if (positions == null || count <= 0)
-        {
-            return;
-        }
+        if (positions == null || count <= 0) return;
 
         float sepSqr = separationRadius * separationRadius;
-        float pushX = 0f;
-        float pushY = 0f;
-
+        Vector2 push = Vector2.zero;
         for (int i = 0; i < count; i++)
         {
-            if (i == selfIndex)
-            {
-                continue;
-            }
-
+            if (i == selfIndex) continue;
             float dx = position.x - positions[i].x;
+            if (dx > separationRadius || dx < -separationRadius) continue;
             float dy = position.y - positions[i].y;
+            if (dy > separationRadius || dy < -separationRadius) continue;
+
             float sqr = dx * dx + dy * dy;
-            if (sqr <= 0.0001f || sqr >= sepSqr)
-            {
-                continue;
-            }
+            if (sqr <= 0.0001f || sqr >= sepSqr) continue;
 
             float dist = Mathf.Sqrt(sqr);
-            float strength = (separationRadius - dist) / separationRadius;
-            float inv = (strength * separationWeight * personalMax) / dist;
-            pushX += dx * inv;
-            pushY += dy * inv;
+            float inv = (((separationRadius - dist) / separationRadius) * separationWeight * personalMax) / dist;
+            push.x += dx * inv;
+            push.y += dy * inv;
         }
 
-        _separation.x = pushX;
-        _separation.y = pushY;
-    }
-
-    private void ApplyYield(
-        Vector2 position,
-        Vector2 groupTarget,
-        Vector2 flowForward,
-        Vector2[] positions,
-        int count,
-        int selfIndex)
-    {
-        if (positions == null || count <= 0)
+        float totalSepSqr = push.sqrMagnitude;
+        float maxPush = personalMax * 1.35f;
+        if (totalSepSqr > maxPush * maxPush && totalSepSqr > 0.0001f)
         {
-            return;
+            push *= (maxPush / Mathf.Sqrt(totalSepSqr));
         }
 
-        float sideX = -flowForward.y;
-        float sideY = flowForward.x;
-        float myAlong = (groupTarget.x - position.x) * flowForward.x + (groupTarget.y - position.y) * flowForward.y;
-        float myLane = (position.x - groupTarget.x) * sideX + (position.y - groupTarget.y) * sideY;
-        float yieldSqr = yieldDistance * yieldDistance;
-        bool mustYield = false;
-
-        for (int i = 0; i < count; i++)
-        {
-            if (i == selfIndex)
-            {
-                continue;
-            }
-
-            float dx = position.x - positions[i].x;
-            float dy = position.y - positions[i].y;
-            float sqr = dx * dx + dy * dy;
-            if (sqr > yieldSqr)
-            {
-                continue;
-            }
-
-            float otherAlong = (groupTarget.x - positions[i].x) * flowForward.x
-                + (groupTarget.y - positions[i].y) * flowForward.y;
-            if (otherAlong >= myAlong)
-            {
-                continue;
-            }
-
-            float otherLane = (positions[i].x - groupTarget.x) * sideX + (positions[i].y - groupTarget.y) * sideY;
-            float laneDelta = myLane - otherLane;
-            if (laneDelta < 0f)
-            {
-                laneDelta = -laneDelta;
-            }
-
-            if (laneDelta <= yieldLaneWidth)
-            {
-                mustYield = true;
-                break;
-            }
-        }
-
-        if (!mustYield)
-        {
-            return;
-        }
-
-        _seek.x *= yieldSpeedScale;
-        _seek.y *= yieldSpeedScale;
-        _separation.x *= yieldSpeedScale;
-        _separation.y *= yieldSpeedScale;
+        _separation = push;
     }
 
     private void ApplyObstacleAvoidance(Vector2 position)
     {
-        if (obstacleMask.value == 0 || obstacleCheckDistance <= 0f)
-        {
-            return;
-        }
-
+        if (!_hasObstacleMask || obstacleCheckDistance <= 0f) return;
         float sqr = _desired.sqrMagnitude;
-        if (sqr <= 0.0001f)
+        if (sqr <= 0.0001f) return;
+
+        Vector2 dir = _desired / Mathf.Sqrt(sqr);
+        float bodyRadius = 0.22f;
+        int count = Physics2D.CircleCast(position, bodyRadius, dir, _obstacleFilter, _obstacleHits, obstacleCheckDistance);
+        if (count > 0)
         {
-            return;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit2D hit = _obstacleHits[i];
+                if (hit.collider == null) continue;
+                Vector2 norm = hit.normal;
+                float into = Vector2.Dot(_desired, norm);
+                if (into < 0f)
+                {
+                    _desired -= norm * into;
+                    Vector2 tangent = new Vector2(-norm.y, norm.x);
+                    float sideDot = Vector2.Dot(_desired, tangent);
+                    float sign = sideDot >= 0f ? 1f : -1f;
+                    if (Mathf.Abs(sideDot) < 0.05f)
+                    {
+                        sign = (_formationOffset.x * norm.y - _formationOffset.y * norm.x) >= 0f ? 1f : -1f;
+                    }
+                    _desired += tangent * (sign * (obstacleAvoidWeight * maxSpeed * _speedScale * 0.45f));
+                    break;
+                }
+            }
         }
-
-        float invLen = 1f / Mathf.Sqrt(sqr);
-        Vector2 dir;
-        dir.x = _desired.x * invLen;
-        dir.y = _desired.y * invLen;
-
-        _obstacleFilter.SetLayerMask(obstacleMask);
-        int hits = Physics2D.CircleCast(
-            position,
-            groundCheckRadius,
-            dir,
-            _obstacleFilter,
-            _obstacleHits,
-            obstacleCheckDistance);
-
-        if (hits <= 0)
-        {
-            return;
-        }
-
-        Vector2 normal = _obstacleHits[0].normal;
-        float avoidX = normal.x * obstacleAvoidWeight * maxSpeed * _speedScale;
-        float avoidY = normal.y * obstacleAvoidWeight * maxSpeed * _speedScale;
-        _desired.x += avoidX;
-        _desired.y += avoidY;
     }
 
     private void AccelerateTowardDesired(float dt)
     {
-        float personalMax = maxSpeed * _speedScale;
-        float desiredSqr = _desired.sqrMagnitude;
-        float maxSqr = personalMax * personalMax;
-        if (desiredSqr > maxSqr && desiredSqr > 0.0001f)
-        {
-            float inv = personalMax / Mathf.Sqrt(desiredSqr);
-            _desired.x *= inv;
-            _desired.y *= inv;
-        }
+        float speedMul = _evenSpacingMovement ? 1f : (_speedScale * (1f + _moveIntent * 0.45f));
+        float personalMax = maxSpeed * speedMul;
+        _desired = Vector2.ClampMagnitude(_desired, personalMax);
 
-        float rate = _desired.sqrMagnitude > _velocity.sqrMagnitude
-            ? acceleration * _accelScale * (1f + _moveIntent * 0.85f)
-            : deceleration * _accelScale * (0.65f + (1f - _moveIntent) * 0.35f);
-
-        float step = rate * dt;
-        _velocity.x = Mathf.MoveTowards(_velocity.x, _desired.x, step);
-        _velocity.y = Mathf.MoveTowards(_velocity.y, _desired.y, step);
+        float accelMul = _evenSpacingMovement ? 1f : _accelScale;
+        float rate = _desired.sqrMagnitude > _velocity.sqrMagnitude ? acceleration * accelMul : deceleration * accelMul;
+        _velocity = Vector2.MoveTowards(_velocity, _desired, rate * dt);
     }
 
     private void ApplyMovement(Vector2 position, float dt)
     {
-        _nextPosition.x = position.x + _velocity.x * dt;
-        _nextPosition.y = position.y + _velocity.y * dt;
+        Vector2 delta = _velocity * dt;
+        float dist = delta.magnitude;
 
-        if (groundMask.value != 0 && _isGrounded && !IsOnGround(_nextPosition))
+        if (dist > 0.0001f && _hasObstacleMask)
         {
-            float risk = _velocity.magnitude + _moveIntent * maxSpeed;
-            if (risk < carefulLeaveSpeed * 0.55f)
+            Vector2 dir = delta / dist;
+            int hits = body != null
+                ? body.Cast(dir, _obstacleFilter, _obstacleHits, dist + 0.02f)
+                : Physics2D.CircleCast(position, 0.22f, dir, _obstacleFilter, _obstacleHits, dist + 0.02f);
+
+            RaycastHit2D validHit = default;
+            bool hasValidHit = false;
+            for (int i = 0; i < hits; i++)
             {
-                Vector2 slideX;
-                slideX.x = _nextPosition.x;
-                slideX.y = position.y;
-                Vector2 slideY;
-                slideY.x = position.x;
-                slideY.y = _nextPosition.y;
+                RaycastHit2D h = _obstacleHits[i];
+                if (h.collider == null) continue;
+                if (Vector2.Dot(dir, h.normal) < -0.001f)
+                {
+                    validHit = h;
+                    hasValidHit = true;
+                    break;
+                }
+            }
 
-                if (IsOnGround(slideX))
+            if (hasValidHit)
+            {
+                float safeDist = Mathf.Max(0f, validHit.distance - 0.005f);
+                Vector2 move = dir * safeDist;
+                Vector2 remaining = delta - move;
+
+                float intoWall = Vector2.Dot(_velocity, validHit.normal);
+                if (intoWall < 0f)
                 {
-                    _nextPosition = slideX;
-                    _velocity.y *= 0.2f;
-                }
-                else if (IsOnGround(slideY))
-                {
-                    _nextPosition = slideY;
-                    _velocity.x *= 0.2f;
-                }
-                else
-                {
-                    _nextPosition = position;
-                    _velocity.x *= 0.4f;
-                    _velocity.y *= 0.4f;
+                    _velocity -= validHit.normal * intoWall;
                 }
 
-                // #region agent log
-                if (_debugFallLogs < 40 && Time.frameCount % 30 == 0)
+                float remInto = Vector2.Dot(remaining, validHit.normal);
+                if (remInto < 0f)
                 {
-                    try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix6\",\"hypothesisId\":\"H\",\"location\":\"Creep.cs:ApplyMovement\",\"message\":\"careful edge stay\",\"data\":{\"name\":\"" + name + "\",\"risk\":" + risk.ToString("R") + ",\"moveIntent\":" + _moveIntent.ToString("R") + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
+                    remaining -= validHit.normal * remInto;
                 }
-                // #endregion
+
+                float remDist = remaining.magnitude;
+                if (remDist > 0.0001f)
+                {
+                    Vector2 remDir = remaining / remDist;
+                    int slideHits = body != null
+                        ? body.Cast(remDir, _obstacleFilter, _slideHits, remDist + 0.01f)
+                        : Physics2D.CircleCast(position + move, 0.22f, remDir, _obstacleFilter, _slideHits, remDist + 0.01f);
+
+                    float slideSafe = remDist;
+                    for (int s = 0; s < slideHits; s++)
+                    {
+                        RaycastHit2D sh = _slideHits[s];
+                        if (sh.collider == null) continue;
+                        if (Vector2.Dot(remDir, sh.normal) < -0.001f)
+                        {
+                            slideSafe = Mathf.Min(slideSafe, Mathf.Max(0f, sh.distance - 0.005f));
+                        }
+                    }
+                    move += remDir * slideSafe;
+                }
+
+                if (move.sqrMagnitude < 0.00001f)
+                {
+                    _velocity = Vector2.zero;
+                }
+
+                delta = move;
             }
         }
 
-        if (body != null)
-        {
-            body.MovePosition(_nextPosition);
-            return;
-        }
+        Vector2 next = position + delta;
+        if (body != null) body.MovePosition(next);
+        else _transform.position = next;
 
-        _transform.position = _nextPosition;
+        if (_hasGroundMask && !IsOnGround(next))
+        {
+            _isGrounded = false;
+        }
     }
 
     private void ApplyWalkBob()
     {
         float spd = _velocity.magnitude;
-        if (spd < 0.08f)
+        float angle = _baseEuler.z;
+        if (spd >= 0.08f)
         {
-            _transform.localScale = _baseScale;
-            _transform.localRotation = Quaternion.identity;
-            return;
+            float factor = Mathf.Clamp01(spd / maxSpeed);
+            angle += Mathf.Sin(Time.time * walkBobSpeed + _bobPhase) * walkBobAmplitude * factor;
         }
 
-        float wave = Mathf.Sin(Time.time * walkBobSpeed + _bobPhase);
-        float amount = Mathf.Clamp01(spd / (maxSpeed * 0.65f));
-        float bob = wave * walkBobAmplitude * amount;
-        Vector3 scale = _baseScale;
-        scale.x = _baseScale.x * (1f + bob);
-        scale.y = _baseScale.y * (1f - bob * 0.7f);
-        _transform.localScale = scale;
-        _transform.localRotation = Quaternion.Euler(0f, 0f, wave * walkBobAngle * amount);
-
-        // #region agent log
-        _bobLogTimer += Time.deltaTime;
-        if (_bobLogTimer >= 0.5f && name == "Square")
-        {
-            _bobLogTimer = 0f;
-            try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix6\",\"hypothesisId\":\"I\",\"location\":\"Creep.cs:ApplyWalkBob\",\"message\":\"walk bob\",\"data\":{\"spd\":" + spd.ToString("R") + ",\"bob\":" + bob.ToString("R") + ",\"angle\":" + (wave * walkBobAngle * amount).ToString("R") + ",\"amount\":" + amount.ToString("R") + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
-        }
-        // #endregion
+        if (body != null) body.rotation = angle;
+        else _transform.localEulerAngles = new Vector3(_baseEuler.x, _baseEuler.y, angle);
     }
 
     private void BeginFall()
     {
-        if (_isFalling)
-        {
-            return;
-        }
+        if (_isFalling) return;
 
         _isFalling = true;
         _fallScale = _baseScale;
         _transform.localScale = _baseScale;
-        _transform.localRotation = Quaternion.identity;
         _velocity = Vector2.zero;
 
         if (body != null)
         {
             body.linearVelocity = Vector2.zero;
             body.angularVelocity = 0f;
+            body.rotation = _baseEuler.z;
             body.simulated = false;
         }
-
-        if (bodyCollider != null)
+        else
         {
-            bodyCollider.enabled = false;
+            _transform.localEulerAngles = _baseEuler;
         }
+
+        if (bodyCollider != null) bodyCollider.enabled = false;
     }
 
     private void TickFallScale(float dt)
     {
-        float step = fallScaleSpeed * dt;
-        _fallScale.x = Mathf.MoveTowards(_fallScale.x, minFallScale, step);
-        _fallScale.y = Mathf.MoveTowards(_fallScale.y, minFallScale, step);
-        _fallScale.z = Mathf.MoveTowards(_fallScale.z, minFallScale, step);
+        _fallScale = Vector3.MoveTowards(_fallScale, Vector3.one * minFallScale, fallScaleSpeed * dt);
         _transform.localScale = _fallScale;
-
-        if (_fallScale.x <= minFallScale + 0.0001f)
-        {
-            gameObject.SetActive(false);
-        }
+        if (_fallScale.x <= minFallScale + 0.0001f) gameObject.SetActive(false);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (_isFalling || other == null)
-        {
-            return;
-        }
-
-        if (!IsInLayerMask(other.gameObject.layer, abyssMask))
-        {
-            return;
-        }
-
-        // #region agent log
-        if (_debugFallLogs < 30)
-        {
-            _debugFallLogs++;
-            Vector2 p = _transform.position;
-            try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix3\",\"hypothesisId\":\"B\",\"location\":\"Creep.cs:OnTriggerEnter2D\",\"message\":\"abyss trigger fall\",\"data\":{\"name\":\"" + name + "\",\"px\":" + p.x.ToString("R") + ",\"py\":" + p.y.ToString("R") + ",\"vx\":" + _velocity.x.ToString("R") + ",\"vy\":" + _velocity.y.ToString("R") + ",\"spd\":" + _velocity.magnitude.ToString("R") + ",\"other\":\"" + other.name + "\",\"otherLayer\":" + other.gameObject.layer + ",\"abyssMask\":" + abyssMask.value + ",\"grounded\":" + (_isGrounded ? "true" : "false") + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
-        }
-        // #endregion
+        if (_isFalling || other == null) return;
+        if ((abyssMask.value & (1 << other.gameObject.layer)) == 0) return;
         BeginFall();
-    }
-
-    private static bool IsInLayerMask(int layer, LayerMask mask)
-    {
-        return (mask.value & (1 << layer)) != 0;
     }
 }

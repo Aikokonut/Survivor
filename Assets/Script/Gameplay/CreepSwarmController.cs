@@ -4,22 +4,27 @@ public class CreepSwarmController : MonoBehaviour
 {
     [SerializeField] private Creep[] creeps;
     [SerializeField] private float deadZone = 0.1f;
-    [SerializeField] private float groupMoveSpeed = 5.5f;
     [SerializeField] private float joystickSpeedPower = 1.05f;
-    [SerializeField] private float formationRadius = 1.2f;
-    [SerializeField] private float separationRadius = 0.75f;
-    [SerializeField] private float separationWeight = 2.2f;
+    [SerializeField] private float groupLeadDistance = 0.85f;
+    [SerializeField] private float formationRadius = 0.7f;
+    [SerializeField] private float separationRadius = 0.38f;
+    [SerializeField] private float separationWeight = 1.8f;
+    [SerializeField] private float minSeparationRadius = 0.22f;
     [SerializeField] private float minFormationScale = 0.12f;
-    [SerializeField] private float formationScaleSmooth = 3.5f;
+    [SerializeField] private float formationScaleSmooth = 12f;
     [SerializeField] private float corridorProbeDistance = 2.5f;
-    [SerializeField] private float openWidthForFullFormation = 2.2f;
+    [SerializeField] private float openWidthForFullFormation = 3.2f;
+    [SerializeField] private float passageLookAhead = 2.4f;
+    [SerializeField] private float probeInterval = 0.08f;
     [SerializeField] private LayerMask wallMask;
     [SerializeField] private LayerMask groundMask;
-    [SerializeField] private float groupTargetGroundRadius = 0.2f;
+    [SerializeField] private float groupTargetGroundRadius = 0.15f;
+    [SerializeField] private bool evenSpacingMovement = true;
 
     private Vector2 _joystick;
     private Vector2 _groupTarget;
-    private Vector2 _flowForward;
+    private Vector2 _centroid;
+    private Vector2 _flowForward = Vector2.up;
     private Vector2[] _positions;
     private Vector2[] _formationOffsets;
     private readonly RaycastHit2D[] _probeHits = new RaycastHit2D[1];
@@ -28,27 +33,30 @@ public class CreepSwarmController : MonoBehaviour
     private ContactFilter2D _groundFilter;
     private int _creepCount;
     private bool _groupTargetInitialized;
+    private bool _hasGroundMask;
+    private bool _hasWallMask;
     private float _formationScale = 1f;
-    private static int _debugTargetClampLogs;
+    private float _targetFormationScale = 1f;
+    private float _passageWidth = 99f;
+    private float _probeTimer;
 
     private void Awake()
     {
-        _flowForward.x = 0f;
-        _flowForward.y = 1f;
-        _wallFilter = new ContactFilter2D();
-        _wallFilter.useTriggers = false;
-        _wallFilter.useLayerMask = true;
+        _hasGroundMask = groundMask.value != 0;
+        _hasWallMask = wallMask.value != 0;
+
+        _wallFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
         _wallFilter.SetLayerMask(wallMask);
-        _groundFilter = new ContactFilter2D();
-        _groundFilter.useTriggers = true;
-        _groundFilter.useLayerMask = true;
+
+        _groundFilter = new ContactFilter2D { useTriggers = true, useLayerMask = true };
         _groundFilter.SetLayerMask(groundMask);
-        groupMoveSpeed = 6.5f;
-        joystickSpeedPower = 1f;
-        formationScaleSmooth = 3.5f;
-        openWidthForFullFormation = 2.2f;
-        minFormationScale = 0.15f;
+
         CacheCreeps();
+    }
+
+    private void Start()
+    {
+        ConfigureCreeps();
     }
 
     private void CacheCreeps()
@@ -68,24 +76,22 @@ public class CreepSwarmController : MonoBehaviour
         ConfigureCreeps();
         _groupTargetInitialized = false;
         _formationScale = 1f;
+        _targetFormationScale = 1f;
     }
 
     private void BuildFormationOffsets()
     {
-        if (_creepCount <= 0)
-        {
-            return;
-        }
-
-        float goldenAngle = 2.399963229728653f;
+        if (_creepCount <= 0) return;
+        const float goldenAngle = 2.39996323f;
         float count = _creepCount;
+        float effectiveRadius = evenSpacingMovement
+            ? Mathf.Max(formationRadius, Mathf.Sqrt(count) * 0.22f)
+            : formationRadius;
         for (int i = 0; i < _creepCount; i++)
         {
-            float t = (i + 0.5f) / count;
-            float radius = formationRadius * Mathf.Sqrt(t);
+            float radius = effectiveRadius * Mathf.Sqrt((i + 0.5f) / count);
             float angle = i * goldenAngle;
-            _formationOffsets[i].x = Mathf.Cos(angle) * radius;
-            _formationOffsets[i].y = Mathf.Sin(angle) * radius;
+            _formationOffsets[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
         }
     }
 
@@ -93,404 +99,213 @@ public class CreepSwarmController : MonoBehaviour
     {
         for (int i = 0; i < _creepCount; i++)
         {
-            Creep creep = creeps[i];
-            if (creep == null)
-            {
-                continue;
-            }
-
+            if (creeps[i] == null) continue;
             int seed = i * 73856093;
             float speedScale = 0.82f + ((seed & 255) / 255f) * 0.36f;
             float accelScale = 0.75f + (((seed >> 8) & 255) / 255f) * 0.5f;
-            creep.ConfigureSwarmMember(_formationOffsets[i], speedScale, accelScale);
+            creeps[i].ConfigureSwarmMember(_formationOffsets[i], speedScale, accelScale);
         }
     }
 
     private void FixedUpdate()
     {
-        if (_creepCount <= 0)
-        {
-            return;
-        }
+        if (_creepCount <= 0) return;
 
         float dt = Time.fixedDeltaTime;
         EnsureGroundMaskFromCreeps();
+        UpdateCentroidAndPositions();
         EnsureGroupTarget();
-        IntegrateGroupTarget(dt);
-        CachePositions();
+        UpdateGroupTargetFromCentroid();
         UpdateFormationScale(dt);
 
-        float sepRadius = Mathf.Lerp(separationRadius * 0.42f, separationRadius, _formationScale);
-        float sepWeight = Mathf.Lerp(separationWeight * 0.35f, separationWeight, _formationScale);
+        float sepRadius = evenSpacingMovement
+            ? Mathf.Clamp(separationRadius, 0.48f, 0.56f)
+            : Mathf.Max(minSeparationRadius, separationRadius * Mathf.Lerp(0.7f, 1f, _formationScale));
+        float currentScale = evenSpacingMovement ? 1f : _formationScale;
         float moveIntent = _joystick.magnitude;
-
-        // #region agent log
-        if (Time.frameCount % 20 == 0)
-        {
-            int alive = 0;
-            int falling = 0;
-            for (int c = 0; c < _creepCount; c++)
-            {
-                Creep cr = creeps[c];
-                if (cr == null || !cr.isActiveAndEnabled)
-                {
-                    continue;
-                }
-                alive++;
-                if (cr.IsFalling())
-                {
-                    falling++;
-                }
-            }
-            try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix6\",\"hypothesisId\":\"G\",\"location\":\"CreepSwarmController.cs:FixedUpdate\",\"message\":\"swarm state\",\"data\":{\"alive\":" + alive + ",\"falling\":" + falling + ",\"joyX\":" + _joystick.x.ToString("R") + ",\"joyY\":" + _joystick.y.ToString("R") + ",\"joyMag\":" + moveIntent.ToString("R") + ",\"formScale\":" + _formationScale.ToString("R") + ",\"tx\":" + _groupTarget.x.ToString("R") + ",\"ty\":" + _groupTarget.y.ToString("R") + ",\"groundMask\":" + groundMask.value + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
-        }
-        // #endregion
 
         for (int i = 0; i < _creepCount; i++)
         {
             Creep creep = creeps[i];
-            if (creep == null || !creep.isActiveAndEnabled)
+            if (creep != null && creep.isActiveAndEnabled)
             {
-                continue;
+                creep.TickSwarm(dt, _groupTarget, _flowForward, _joystick, currentScale, _positions, _creepCount, i, sepRadius, separationWeight, moveIntent, evenSpacingMovement);
             }
-
-            creep.TickSwarm(
-                dt,
-                _groupTarget,
-                _flowForward,
-                _formationScale,
-                _positions,
-                _creepCount,
-                i,
-                sepRadius,
-                sepWeight,
-                moveIntent);
         }
     }
 
     private void EnsureGroundMaskFromCreeps()
     {
-        if (groundMask.value != 0 || creeps == null)
+        if (_hasGroundMask || creeps == null) return;
+        for (int i = 0; i < _creepCount; i++)
         {
+            if (creeps[i] == null) continue;
+            LayerMask mask = creeps[i].GetGroundMask();
+            if (mask.value == 0) continue;
+            groundMask = mask;
+            _groundFilter.SetLayerMask(groundMask);
+            _hasGroundMask = true;
             return;
         }
+    }
 
+    private void UpdateCentroidAndPositions()
+    {
+        Vector2 sum = Vector2.zero;
+        int alive = 0;
         for (int i = 0; i < _creepCount; i++)
         {
             Creep creep = creeps[i];
-            if (creep == null)
+            if (creep == null || !creep.isActiveAndEnabled || creep.IsFalling())
             {
+                _positions[i] = new Vector2(9999f, 9999f);
                 continue;
             }
-
-            LayerMask mask = creep.GetGroundMask();
-            if (mask.value == 0)
-            {
-                continue;
-            }
-
-            groundMask = mask;
-            _groundFilter.SetLayerMask(groundMask);
-            // #region agent log
-            try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix4\",\"hypothesisId\":\"G\",\"location\":\"CreepSwarmController.cs:EnsureGroundMaskFromCreeps\",\"message\":\"copied ground mask from creep\",\"data\":{\"groundMask\":" + groundMask.value + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
-            // #endregion
-            return;
+            Vector2 pos = creep.GetPosition();
+            _positions[i] = pos;
+            sum += pos;
+            alive++;
         }
+        if (alive > 0) _centroid = sum / alive;
     }
 
     private void EnsureGroupTarget()
     {
-        if (_groupTargetInitialized)
-        {
-            return;
-        }
-
-        float sumX = 0f;
-        float sumY = 0f;
-        int alive = 0;
-
-        for (int i = 0; i < _creepCount; i++)
-        {
-            Creep creep = creeps[i];
-            if (creep == null || !creep.isActiveAndEnabled)
-            {
-                continue;
-            }
-
-            Vector2 position = creep.GetPosition();
-            sumX += position.x;
-            sumY += position.y;
-            alive++;
-        }
-
-        if (alive <= 0)
-        {
-            return;
-        }
-
-        float inv = 1f / alive;
-        _groupTarget.x = sumX * inv;
-        _groupTarget.y = sumY * inv;
+        if (_groupTargetInitialized) return;
+        _groupTarget = _centroid;
         _groupTargetInitialized = true;
     }
 
-    private void IntegrateGroupTarget(float dt)
+    private void UpdateGroupTargetFromCentroid()
     {
         float sqr = _joystick.sqrMagnitude;
-        if (sqr <= 0f)
+        if (sqr <= 0.0001f)
         {
+            _groupTarget = _centroid;
+            CenterOnPassage(ref _groupTarget);
             return;
         }
 
         float mag = Mathf.Sqrt(sqr);
-        _flowForward.x = _joystick.x / mag;
-        _flowForward.y = _joystick.y / mag;
+        _flowForward = _joystick / mag;
 
-        float curved = Mathf.Pow(mag, joystickSpeedPower);
-        float step = groupMoveSpeed * curved * dt;
-        Vector2 next;
-        next.x = _groupTarget.x + _flowForward.x * step;
-        next.y = _groupTarget.y + _flowForward.y * step;
+        float lead = Mathf.Max(groupLeadDistance * 0.35f, groupLeadDistance * Mathf.Pow(mag, joystickSpeedPower));
+        Vector2 next = _centroid + _flowForward * lead;
+        if (!IsGroupTargetOnGround(next))
+        {
+            next = _centroid + _flowForward * (lead * 0.45f);
+        }
+
         ApplyGroupTargetMove(next);
+        CenterOnPassage(ref _groupTarget);
+
+        float maxLead = groupLeadDistance * 1.35f;
+        if (Vector2.SqrMagnitude(_groupTarget - _centroid) > maxLead * maxLead || !IsGroupTargetOnGround(_groupTarget))
+        {
+            _groupTarget = _centroid;
+            CenterOnPassage(ref _groupTarget);
+        }
+    }
+
+    private void CenterOnPassage(ref Vector2 target)
+    {
+        if (!_hasGroundMask && !_hasWallMask) return;
+
+        Vector2 side = new Vector2(-_flowForward.y, _flowForward.x);
+        float left = _hasGroundMask ? ProbeWalkableDistance(target, -side) : ProbeDistance(target, -side);
+        float right = _hasGroundMask ? ProbeWalkableDistance(target, side) : ProbeDistance(target, side);
+
+        _passageWidth = left + right;
+        float shift = (right - left) * 0.5f;
+        if (Mathf.Abs(shift) <= 0.001f) return;
+
+        Vector2 centered = target + side * shift;
+        if (!_hasGroundMask || IsGroupTargetOnGround(centered)) target = centered;
     }
 
     private void ApplyGroupTargetMove(Vector2 next)
     {
-        if (groundMask.value == 0 || IsGroupTargetOnGround(next))
-        {
-            _groupTarget = next;
-            return;
-        }
-
-        Vector2 slideX;
-        slideX.x = next.x;
-        slideX.y = _groupTarget.y;
-        Vector2 slideY;
-        slideY.x = _groupTarget.x;
-        slideY.y = next.y;
-
-        if (IsGroupTargetOnGround(slideX))
-        {
-            _groupTarget = slideX;
-            // #region agent log
-            LogTargetClamp("slideX", next);
-            // #endregion
-            return;
-        }
-
-        if (IsGroupTargetOnGround(slideY))
-        {
-            _groupTarget = slideY;
-            // #region agent log
-            LogTargetClamp("slideY", next);
-            // #endregion
-            return;
-        }
-
-        // #region agent log
-        LogTargetClamp("blocked", next);
-        // #endregion
-    }
-
-    private void LogTargetClamp(string mode, Vector2 next)
-    {
-        if (_debugTargetClampLogs >= 25)
-        {
-            return;
-        }
-
-        _debugTargetClampLogs++;
-        try { System.IO.File.AppendAllText(@"D:\Project\Survivor\debug-b47418.log", "{\"sessionId\":\"b47418\",\"runId\":\"post-fix4\",\"hypothesisId\":\"G\",\"location\":\"CreepSwarmController.cs:ApplyGroupTargetMove\",\"message\":\"group target clamped\",\"data\":{\"mode\":\"" + mode + "\",\"nx\":" + next.x.ToString("R") + ",\"ny\":" + next.y.ToString("R") + ",\"tx\":" + _groupTarget.x.ToString("R") + ",\"ty\":" + _groupTarget.y.ToString("R") + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}\n"); } catch {}
+        if (!_hasGroundMask || IsGroupTargetOnGround(next)) { _groupTarget = next; return; }
+        Vector2 slideX = new Vector2(next.x, _groupTarget.y);
+        if (IsGroupTargetOnGround(slideX)) { _groupTarget = slideX; return; }
+        Vector2 slideY = new Vector2(_groupTarget.x, next.y);
+        if (IsGroupTargetOnGround(slideY)) { _groupTarget = slideY; }
     }
 
     private bool IsGroupTargetOnGround(Vector2 position)
     {
-        if (groundMask.value == 0)
-        {
-            return true;
-        }
-
-        _groundFilter.SetLayerMask(groundMask);
-        int hitCount = Physics2D.OverlapCircle(
-            position,
-            groupTargetGroundRadius,
-            _groundFilter,
-            _groundHits);
-        return hitCount > 0;
+        return !_hasGroundMask || Physics2D.OverlapCircle(position, groupTargetGroundRadius, _groundFilter, _groundHits) > 0;
     }
 
     private void UpdateFormationScale(float dt)
     {
-        float targetScale = EvaluatePassageScale();
-        float rate = formationScaleSmooth;
-        if (targetScale > _formationScale)
+        _probeTimer -= dt;
+        if (_probeTimer <= 0f)
         {
-            rate *= 2.8f;
+            _probeTimer = probeInterval;
+            _targetFormationScale = EvaluatePassageScale();
         }
-
-        float step = rate * dt;
-        _formationScale = Mathf.MoveTowards(_formationScale, targetScale, step);
+        _formationScale = Mathf.MoveTowards(_formationScale, _targetFormationScale, formationScaleSmooth * dt);
     }
 
     private float EvaluatePassageScale()
     {
-        float scale = 1f;
+        if (!_hasGroundMask && !_hasWallMask) return 1f;
 
-        if (groundMask.value != 0)
+        float width = Mathf.Min(MeasureNarrowestAhead(_centroid), MeasureNarrowestAhead(_groupTarget));
+        _passageWidth = Mathf.Min(_passageWidth, width);
+
+        float scale = (openWidthForFullFormation > 0.01f && width < openWidthForFullFormation)
+            ? width / openWidthForFullFormation
+            : 1f;
+        return Mathf.Clamp(scale, minFormationScale, 1f);
+    }
+
+    private float MeasureNarrowestAhead(Vector2 origin)
+    {
+        float minWidth = 999f;
+        for (int i = 0; i <= 2; i++)
         {
-            float widthHere = MeasureWalkableWidth(_groupTarget);
-            Vector2 ahead;
-            ahead.x = _groupTarget.x + _flowForward.x * 0.8f;
-            ahead.y = _groupTarget.y + _flowForward.y * 0.8f;
-            float widthAhead = MeasureWalkableWidth(ahead);
-            float width = widthHere;
-            if (widthAhead < width)
-            {
-                width = widthAhead;
-            }
-
-            if (width < openWidthForFullFormation && openWidthForFullFormation > 0.01f)
-            {
-                scale = width / openWidthForFullFormation;
-            }
+            Vector2 sample = origin + _flowForward * (passageLookAhead * (i * 0.5f));
+            if (_hasGroundMask) minWidth = Mathf.Min(minWidth, MeasureWalkableWidth(sample));
+            if (_hasWallMask) minWidth = Mathf.Min(minWidth, MeasurePassageWidth(sample));
         }
-
-        if (wallMask.value != 0)
-        {
-            _wallFilter.SetLayerMask(wallMask);
-            float widthHere = MeasurePassageWidth(_groupTarget);
-            Vector2 ahead;
-            ahead.x = _groupTarget.x + _flowForward.x * 0.8f;
-            ahead.y = _groupTarget.y + _flowForward.y * 0.8f;
-            float widthAhead = MeasurePassageWidth(ahead);
-            float width = widthHere;
-            if (widthAhead < width)
-            {
-                width = widthAhead;
-            }
-
-            float wallScale = 1f;
-            if (width < openWidthForFullFormation && openWidthForFullFormation > 0.01f)
-            {
-                wallScale = width / openWidthForFullFormation;
-            }
-
-            if (wallScale < scale)
-            {
-                scale = wallScale;
-            }
-        }
-
-        if (scale < minFormationScale)
-        {
-            return minFormationScale;
-        }
-
-        if (scale > 1f)
-        {
-            return 1f;
-        }
-
-        return scale;
+        return minWidth > 900f ? openWidthForFullFormation : minWidth;
     }
 
     private float MeasureWalkableWidth(Vector2 origin)
     {
-        Vector2 side;
-        side.x = -_flowForward.y;
-        side.y = _flowForward.x;
-
-        float left = ProbeWalkableDistance(origin, side);
-        float right = ProbeWalkableDistance(origin, -side);
-        float width = left + right;
-        if (width <= 0.01f)
-        {
-            return 0.01f;
-        }
-
-        return width;
+        Vector2 side = new Vector2(-_flowForward.y, _flowForward.x);
+        return Mathf.Max(ProbeWalkableDistance(origin, side) + ProbeWalkableDistance(origin, -side), 0.01f);
     }
 
     private float ProbeWalkableDistance(Vector2 origin, Vector2 direction)
     {
-        float step = 0.12f;
         float distance = 0f;
-        for (float d = step; d <= corridorProbeDistance; d += step)
+        for (float d = 0.25f; d <= corridorProbeDistance; d += 0.25f)
         {
-            Vector2 sample;
-            sample.x = origin.x + direction.x * d;
-            sample.y = origin.y + direction.y * d;
-            if (!IsGroupTargetOnGround(sample))
-            {
-                break;
-            }
-
+            if (!IsGroupTargetOnGround(origin + direction * d)) break;
             distance = d;
         }
-
         return distance;
     }
 
     private float MeasurePassageWidth(Vector2 origin)
     {
-        Vector2 side;
-        side.x = -_flowForward.y;
-        side.y = _flowForward.x;
-
-        float left = ProbeDistance(origin, side);
-        float right = ProbeDistance(origin, -side);
-        float width = left + right;
-        if (width <= 0.01f)
-        {
-            return 0.01f;
-        }
-
-        return width;
+        Vector2 side = new Vector2(-_flowForward.y, _flowForward.x);
+        return Mathf.Max(ProbeDistance(origin, side) + ProbeDistance(origin, -side), 0.01f);
     }
 
     private float ProbeDistance(Vector2 origin, Vector2 direction)
     {
-        int hits = Physics2D.Raycast(
-            origin,
-            direction,
-            _wallFilter,
-            _probeHits,
-            corridorProbeDistance);
-        if (hits <= 0)
-        {
-            return corridorProbeDistance;
-        }
-
-        return _probeHits[0].distance;
-    }
-
-    private void CachePositions()
-    {
-        for (int i = 0; i < _creepCount; i++)
-        {
-            Creep creep = creeps[i];
-            if (creep == null || !creep.isActiveAndEnabled)
-            {
-                _positions[i].x = 0f;
-                _positions[i].y = 0f;
-                continue;
-            }
-
-            _positions[i] = creep.GetPosition();
-        }
+        return Physics2D.Raycast(origin, direction, _wallFilter, _probeHits, corridorProbeDistance) <= 0
+            ? corridorProbeDistance
+            : _probeHits[0].distance;
     }
 
     public void SetJoystickInput(Vector2 input)
     {
-        if (input.sqrMagnitude < deadZone * deadZone)
-        {
-            _joystick.x = 0f;
-            _joystick.y = 0f;
-            return;
-        }
-
-        _joystick.x = input.x;
-        _joystick.y = input.y;
+        _joystick = input.sqrMagnitude < deadZone * deadZone ? Vector2.zero : input;
     }
 
     public void SetCreeps(Creep[] newCreeps)
