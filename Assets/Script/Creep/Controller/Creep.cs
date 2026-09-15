@@ -4,22 +4,17 @@ public class Creep : MonoBehaviour
 {
     [SerializeField] private Rigidbody2D body;
     [SerializeField] private Collider2D bodyCollider;
+    [SerializeField] private GameObject leaderArrow;
     [SerializeField] private float maxSpeed = 4.5f;
     [SerializeField] private float acceleration = 16f;
     [SerializeField] private float deceleration = 11f;
-    [SerializeField] private float arriveRadius = 0.9f;
+    [SerializeField] private float idleDeceleration = 5.5f;
     [SerializeField] private float slotFollowWeight = 1f;
-    [SerializeField] private float queueSpacing = 0.55f;
-    [SerializeField] private float yieldDistance = 0.7f;
-    [SerializeField] private float yieldSpeedScale = 0.28f;
-    [SerializeField] private float yieldLaneWidth = 0.55f;
     [SerializeField] private float obstacleCheckDistance = 0.55f;
     [SerializeField] private float obstacleAvoidWeight = 1.4f;
     [SerializeField] private float groundCheckRadius = 0.05f;
     [SerializeField] private float fallGraceTime = 0.06f;
-    [SerializeField] private float carefulLeaveSpeed = 1.6f;
     [SerializeField] private float catchUpDistance = 1.4f;
-    [SerializeField] private float catchUpBoost = 1.75f;
     [SerializeField] private float walkBobAmplitude = 10f;
     [SerializeField] private float walkBobSpeed = 22f;
     [SerializeField] private LayerMask groundMask;
@@ -27,14 +22,22 @@ public class Creep : MonoBehaviour
     [SerializeField] private LayerMask obstacleMask;
     [SerializeField] private float fallScaleSpeed = 2.5f;
     [SerializeField] private float minFallScale = 0.05f;
+    [SerializeField] private float idleSettleSpeed = 0.85f;
+    [SerializeField] private float idleSlotMaxSpeed = 2.4f;
+    [SerializeField] private float bodyRadius = 0.22f;
+    [SerializeField] private float partingLaneWidth = 0.7f;
+    [SerializeField] private float partingWeight = 2.6f;
+    [SerializeField] private float leaderClearRadius = 0.7f;
+    [SerializeField] private float moveSeekWeight = 0.32f;
+    [SerializeField] private float moveTurnAccelScale = 1.55f;
+    [SerializeField] private float leaderDriveScale = 0.97f;
+    [SerializeField] private float followerBehindPull = 1.2f;
+    [SerializeField] private float followerBackBias = 0.45f;
 
     private Transform _transform;
     private Vector2 _formationOffset;
     private Vector2 _velocity;
     private Vector2 _desired;
-    private Vector2 _seek;
-    private Vector2 _separation;
-    private Vector2 _groupTarget;
     private Vector3 _baseScale;
     private Vector3 _baseEuler;
     private Vector3 _fallScale;
@@ -43,24 +46,22 @@ public class Creep : MonoBehaviour
     private readonly RaycastHit2D[] _slideHits = new RaycastHit2D[4];
     private ContactFilter2D _groundFilter;
     private ContactFilter2D _obstacleFilter;
-    private float _speedScale = 1f;
-    private float _accelScale = 1f;
     private float _airTime;
     private float _bobPhase;
     private float _moveIntent;
     private bool _isGrounded;
     private bool _isFalling;
+    private bool _isDead;
+    private bool _isLeader;
     private bool _configured;
     private bool _hasGroundMask;
     private bool _hasObstacleMask;
     private bool _groundChecked;
-    private bool _evenSpacingMovement;
+
+    public event System.Action<Creep> onDied;
 
     private void Awake()
     {
-        if (groundCheckRadius > 0.08f) groundCheckRadius = 0.05f;
-        if (fallGraceTime > 0.08f) fallGraceTime = 0.06f;
-
         _transform = transform;
         _baseScale = _transform.localScale;
         _baseEuler = _transform.localEulerAngles;
@@ -68,10 +69,8 @@ public class Creep : MonoBehaviour
         _bobPhase = Mathf.Abs(GetInstanceID() % 628) * 0.01f;
         _hasGroundMask = groundMask.value != 0;
         _hasObstacleMask = obstacleMask.value != 0;
-
         _groundFilter = new ContactFilter2D { useTriggers = true, useLayerMask = true };
         _groundFilter.SetLayerMask(groundMask);
-
         _obstacleFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
         _obstacleFilter.SetLayerMask(obstacleMask);
 
@@ -82,31 +81,41 @@ public class Creep : MonoBehaviour
             body.gravityScale = 0f;
             body.linearVelocity = Vector2.zero;
             body.angularVelocity = 0f;
-            body.constraints = RigidbodyConstraints2D.None;
         }
+
+        if (leaderArrow != null) leaderArrow.SetActive(_isLeader);
     }
 
-    public void ConfigureSwarmMember(Vector2 formationOffset, float speedScale, float accelScale)
+    private void OnEnable()
+    {
+        _isDead = false;
+        _isFalling = false;
+    }
+
+    private void OnDisable()
+    {
+        if (_isDead) return;
+        _isDead = true;
+        SetLeader(false);
+        if (onDied != null) onDied.Invoke(this);
+    }
+
+    public void ConfigureSwarmMember(Vector2 formationOffset)
     {
         _formationOffset = formationOffset;
-        _speedScale = speedScale;
-        _accelScale = accelScale;
         _configured = true;
     }
 
-    public Vector2 GetPosition()
-    {
-        return _transform.position;
-    }
+    public Vector2 GetPosition() { return _transform.position; }
+    public LayerMask GetGroundMask() { return groundMask; }
+    public bool IsFalling() { return _isFalling; }
+    public bool IsDead() { return _isDead || _isFalling; }
+    public bool IsLeader() { return _isLeader; }
 
-    public LayerMask GetGroundMask()
+    public void SetLeader(bool isLeader)
     {
-        return groundMask;
-    }
-
-    public bool IsFalling()
-    {
-        return _isFalling;
+        _isLeader = isLeader;
+        if (leaderArrow != null) leaderArrow.SetActive(isLeader);
     }
 
     public void TickSwarm(
@@ -121,7 +130,8 @@ public class Creep : MonoBehaviour
         float separationRadius,
         float separationWeight,
         float moveIntent,
-        bool evenSpacingMovement = true)
+        Vector2 leaderPosition,
+        int leaderIndex)
     {
         if (_isFalling) { TickFallScale(dt); return; }
         if (!_configured) return;
@@ -140,14 +150,12 @@ public class Creep : MonoBehaviour
         }
 
         _moveIntent = moveIntent;
-        _groupTarget = groupTarget;
-        _evenSpacingMovement = evenSpacingMovement;
-
         Vector2 position = _transform.position;
-        BuildDesiredVelocity(position, groupTarget, flowForward, moveInput, formationScale, positions, count, selfIndex, separationRadius, separationWeight, evenSpacingMovement);
-        ApplyObstacleAvoidance(position);
-        AccelerateTowardDesired(dt);
-        ApplyMovement(position, dt);
+        BuildDesired(position, groupTarget, flowForward, moveInput, formationScale, positions, count, selfIndex, separationRadius, separationWeight, leaderPosition, leaderIndex);
+        AvoidObstacles(position);
+        IntegrateVelocity(dt);
+        Move(position, dt, positions, count, selfIndex, leaderIndex);
+        if (positions != null && selfIndex >= 0 && selfIndex < count) positions[selfIndex] = _transform.position;
         ApplyWalkBob();
     }
 
@@ -163,7 +171,7 @@ public class Creep : MonoBehaviour
         if (_airTime >= fallGraceTime) BeginFall();
     }
 
-    private void BuildDesiredVelocity(
+    private void BuildDesired(
         Vector2 position,
         Vector2 groupTarget,
         Vector2 flowForward,
@@ -172,188 +180,147 @@ public class Creep : MonoBehaviour
         Vector2[] positions,
         int count,
         int selfIndex,
-        float separationRadius,
-        float separationWeight,
-        bool evenSpacingMovement)
+        float sepRadius,
+        float sepWeight,
+        Vector2 leaderPos,
+        int leaderIndex)
     {
-        float effectiveSpeedScale = evenSpacingMovement ? 1f : _speedScale;
-        float personalMax = maxSpeed * effectiveSpeedScale;
         bool moving = _moveIntent > 0.05f;
-        _seek = Vector2.zero;
-        _separation = Vector2.zero;
 
-        float sideX = -flowForward.y;
-        float sideY = flowForward.x;
-        Vector2 side = new Vector2(sideX, sideY);
-        float lateral = (position.x - groupTarget.x) * sideX + (position.y - groupTarget.y) * sideY;
+        if (_isLeader)
+        {
+            _desired = moving ? moveInput * (maxSpeed * leaderDriveScale) : Vector2.zero;
+            return;
+        }
 
-        ApplySeparation(position, positions, count, selfIndex, separationRadius, separationWeight, personalMax);
+        Vector2 sep = SoftSep(position, positions, count, selfIndex, sepRadius, sepWeight, leaderIndex);
 
         if (!moving)
         {
-            if (evenSpacingMovement)
+            if (_velocity.sqrMagnitude > idleSettleSpeed * idleSettleSpeed)
             {
-                Vector2 idleSlot = groupTarget + _formationOffset;
-                Vector2 toIdleSlot = idleSlot - position;
-                _seek = Vector2.ClampMagnitude(toIdleSlot * (slotFollowWeight * 1.0f), personalMax * 0.45f);
-                _desired = _seek + _separation;
+                _desired = Vector2.zero;
                 return;
             }
 
-            float stopPushLimit = personalMax * 0.45f;
-            float sepSqr = _separation.sqrMagnitude;
-            if (sepSqr > stopPushLimit * stopPushLimit && sepSqr > 0.0001f)
-            {
-                _separation *= (stopPushLimit / Mathf.Sqrt(sepSqr));
-            }
-            float bridgeHold = lateral * (1f - formationScale) * 0.65f;
-            _desired = _separation - side * bridgeHold;
+            Vector2 toSlot = groupTarget + _formationOffset - position;
+            if (toSlot.sqrMagnitude < 0.008f) { _desired = Vector2.zero; return; }
+            _desired = Vector2.ClampMagnitude(toSlot * (slotFollowWeight * 1.35f), idleSlotMaxSpeed) + sep * 0.25f;
             return;
         }
 
-        float compress = Mathf.Max(0f, 1f - formationScale);
+        Vector2 forward = flowForward.sqrMagnitude > 0.0001f ? flowForward.normalized : Vector2.up;
+        Vector2 side = new Vector2(-forward.y, forward.x);
+        float lat = Vector2.Dot(_formationOffset, side);
+        float alongOff = -Mathf.Abs(Vector2.Dot(_formationOffset, forward)) - followerBackBias;
+        Vector2 slot = groupTarget + side * (lat * formationScale) + forward * (alongOff * formationScale);
 
-        if (evenSpacingMovement)
+        Vector2 drive = moveInput * maxSpeed;
+        float along = Vector2.Dot(position - leaderPos, forward);
+        if (along > 0f) drive -= forward * (along * followerBehindPull * maxSpeed * 0.25f);
+
+        Vector2 seek = Vector2.ClampMagnitude((slot - position) * (slotFollowWeight * moveSeekWeight), maxSpeed * 0.3f);
+        Vector2 parting = SidePush(position, leaderPos, forward, maxSpeed);
+        _desired = drive + seek + sep * 0.5f + parting;
+
+        Vector2 toGroup = groupTarget - position;
+        float far = catchUpDistance * 2.8f;
+        if (toGroup.sqrMagnitude > far * far)
         {
-            Vector2 moveSlot = groupTarget + _formationOffset;
-            Vector2 toMoveSlot = moveSlot - position;
-            _seek = Vector2.ClampMagnitude(toMoveSlot * (slotFollowWeight * 1.0f), personalMax * 0.45f);
-
-            _desired = moveInput * personalMax + _seek + _separation;
-
-            Vector2 toGroup = groupTarget - position;
-            float toGroupSqr = toGroup.sqrMagnitude;
-            float farBehindDist = catchUpDistance * 2.2f;
-            if (toGroupSqr > farBehindDist * farBehindDist)
-            {
-                _desired += toGroup * (personalMax * 0.4f / Mathf.Sqrt(toGroupSqr));
-            }
-            return;
-        }
-
-        personalMax *= (1f + _moveIntent * 0.35f);
-
-        float rawLat = _formationOffset.x * sideX + _formationOffset.y * sideY;
-        float rawAlong = _formationOffset.x * flowForward.x + _formationOffset.y * flowForward.y;
-        float latOff = rawLat * formationScale;
-        float alongOff = rawAlong * Mathf.Lerp(1f, 2.5f, compress) - rawLat * (compress * 1.2f);
-        Vector2 slot = groupTarget + side * latOff + flowForward * alongOff;
-
-        Vector2 toSlot = slot - position;
-        Vector2 toTarget = groupTarget - position;
-        float blend = Mathf.Lerp(0.15f, 0.35f, compress);
-        Vector2 seek = Vector2.Lerp(toSlot, toTarget, blend);
-        float seekSqr = seek.sqrMagnitude;
-
-        if (seekSqr > 0.0001f)
-        {
-            float dist = Mathf.Sqrt(seekSqr);
-            float arrive = Mathf.Lerp(0.2f, arriveRadius * 0.65f, formationScale) * 0.35f;
-            float speed = dist < arrive ? personalMax * Mathf.Max(0.7f, dist / Mathf.Max(arrive, 0.05f)) : personalMax;
-            _seek = seek * ((speed / dist) * slotFollowWeight * (0.55f + _moveIntent * 0.55f));
-        }
-
-        float funnelLegacy = Mathf.Clamp(lateral * 1.5f, -1f, 1f) * (personalMax * 0.4f * compress);
-        Vector2 funnelForce = side * funnelLegacy;
-        _seek -= funnelForce;
-
-        float driveScaleLegacy = Mathf.Lerp(0.55f, 1f, formationScale);
-        _desired = moveInput * (personalMax * driveScaleLegacy) + _seek * 0.65f + _separation;
-
-        Vector2 toGroupLegacy = groupTarget - position;
-        float toGroupLegacySqr = toGroupLegacy.sqrMagnitude;
-        if (toGroupLegacySqr > catchUpDistance * catchUpDistance)
-        {
-            _desired += toGroupLegacy * (catchUpBoost * personalMax / Mathf.Sqrt(toGroupLegacySqr));
+            _desired += toGroup * (maxSpeed * 0.22f / Mathf.Sqrt(toGroup.sqrMagnitude));
         }
     }
 
-    private void ApplySeparation(
-        Vector2 position,
-        Vector2[] positions,
-        int count,
-        int selfIndex,
-        float separationRadius,
-        float separationWeight,
-        float personalMax)
+    private Vector2 SidePush(Vector2 position, Vector2 leaderPos, Vector2 forward, float personalMax)
     {
-        if (positions == null || count <= 0) return;
+        Vector2 delta = position - leaderPos;
+        Vector2 side = new Vector2(-forward.y, forward.x);
+        float along = Vector2.Dot(delta, forward);
+        float lat = Vector2.Dot(delta, side);
+        float absLat = Mathf.Abs(lat);
+        float strength = 0f;
 
-        float sepSqr = separationRadius * separationRadius;
+        if (along > -0.45f && along < 1.25f && absLat < partingLaneWidth)
+        {
+            float t = (1f - Mathf.Clamp01((along + 0.45f) / 1.7f)) * (1f - absLat / partingLaneWidth);
+            strength = t * partingWeight * personalMax;
+        }
+
+        float clearSqr = leaderClearRadius * leaderClearRadius;
+        if (delta.sqrMagnitude < clearSqr && delta.sqrMagnitude > 0.000001f)
+        {
+            float d = Mathf.Sqrt(delta.sqrMagnitude);
+            strength = Mathf.Max(strength, ((leaderClearRadius - d) / leaderClearRadius) * 2.2f * personalMax);
+        }
+
+        if (strength <= 0f) return Vector2.zero;
+        float sign = lat >= 0f ? 1f : -1f;
+        if (absLat < 0.04f) sign = Vector2.Dot(_formationOffset, side) >= 0f ? 1f : -1f;
+        return side * (sign * strength);
+    }
+
+    private Vector2 SoftSep(Vector2 position, Vector2[] positions, int count, int selfIndex, float radius, float weight, int leaderIndex)
+    {
+        if (positions == null || count <= 0 || radius <= 0f) return Vector2.zero;
+
+        float sepSqr = radius * radius;
         Vector2 push = Vector2.zero;
         for (int i = 0; i < count; i++)
         {
-            if (i == selfIndex) continue;
-            float dx = position.x - positions[i].x;
-            if (dx > separationRadius || dx < -separationRadius) continue;
-            float dy = position.y - positions[i].y;
-            if (dy > separationRadius || dy < -separationRadius) continue;
-
-            float sqr = dx * dx + dy * dy;
+            if (i == selfIndex || i == leaderIndex) continue;
+            Vector2 d = position - positions[i];
+            float sqr = d.sqrMagnitude;
             if (sqr <= 0.0001f || sqr >= sepSqr) continue;
-
             float dist = Mathf.Sqrt(sqr);
-            float inv = (((separationRadius - dist) / separationRadius) * separationWeight * personalMax) / dist;
-            push.x += dx * inv;
-            push.y += dy * inv;
+            push += d * ((((radius - dist) / radius) * weight * maxSpeed) / dist);
         }
 
-        float totalSepSqr = push.sqrMagnitude;
-        float maxPush = personalMax * 1.35f;
-        if (totalSepSqr > maxPush * maxPush && totalSepSqr > 0.0001f)
-        {
-            push *= (maxPush / Mathf.Sqrt(totalSepSqr));
-        }
-
-        _separation = push;
+        float maxPush = maxSpeed * 1.1f;
+        if (push.sqrMagnitude > maxPush * maxPush) push = push.normalized * maxPush;
+        return push;
     }
 
-    private void ApplyObstacleAvoidance(Vector2 position)
+    private void AvoidObstacles(Vector2 position)
     {
-        if (!_hasObstacleMask || obstacleCheckDistance <= 0f) return;
-        float sqr = _desired.sqrMagnitude;
-        if (sqr <= 0.0001f) return;
+        if (!_hasObstacleMask || obstacleCheckDistance <= 0f || _desired.sqrMagnitude <= 0.0001f) return;
 
-        Vector2 dir = _desired / Mathf.Sqrt(sqr);
-        float bodyRadius = 0.22f;
+        Vector2 dir = _desired.normalized;
         int count = Physics2D.CircleCast(position, bodyRadius, dir, _obstacleFilter, _obstacleHits, obstacleCheckDistance);
-        if (count > 0)
+        for (int i = 0; i < count; i++)
         {
-            for (int i = 0; i < count; i++)
+            RaycastHit2D hit = _obstacleHits[i];
+            if (hit.collider == null) continue;
+            float into = Vector2.Dot(_desired, hit.normal);
+            if (into >= 0f) continue;
+
+            _desired -= hit.normal * into;
+            if (_moveIntent > 0.05f)
             {
-                RaycastHit2D hit = _obstacleHits[i];
-                if (hit.collider == null) continue;
-                Vector2 norm = hit.normal;
-                float into = Vector2.Dot(_desired, norm);
-                if (into < 0f)
-                {
-                    _desired -= norm * into;
-                    Vector2 tangent = new Vector2(-norm.y, norm.x);
-                    float sideDot = Vector2.Dot(_desired, tangent);
-                    float sign = sideDot >= 0f ? 1f : -1f;
-                    if (Mathf.Abs(sideDot) < 0.05f)
-                    {
-                        sign = (_formationOffset.x * norm.y - _formationOffset.y * norm.x) >= 0f ? 1f : -1f;
-                    }
-                    _desired += tangent * (sign * (obstacleAvoidWeight * maxSpeed * _speedScale * 0.45f));
-                    break;
-                }
+                Vector2 tangent = new Vector2(-hit.normal.y, hit.normal.x);
+                float sign = Vector2.Dot(_desired, tangent) >= 0f ? 1f : -1f;
+                _desired += tangent * (sign * obstacleAvoidWeight * maxSpeed * 0.45f);
             }
+            break;
         }
     }
 
-    private void AccelerateTowardDesired(float dt)
+    private void IntegrateVelocity(float dt)
     {
-        float speedMul = _evenSpacingMovement ? 1f : (_speedScale * (1f + _moveIntent * 0.45f));
-        float personalMax = maxSpeed * speedMul;
-        _desired = Vector2.ClampMagnitude(_desired, personalMax);
+        float cap = _moveIntent > 0.05f ? maxSpeed * (_isLeader ? leaderDriveScale : 1f) : idleSlotMaxSpeed;
+        _desired = Vector2.ClampMagnitude(_desired, cap);
 
-        float accelMul = _evenSpacingMovement ? 1f : _accelScale;
-        float rate = _desired.sqrMagnitude > _velocity.sqrMagnitude ? acceleration * accelMul : deceleration * accelMul;
+        float rate = _desired.sqrMagnitude > _velocity.sqrMagnitude
+            ? acceleration * (_moveIntent > 0.05f ? moveTurnAccelScale : 1f)
+            : (_moveIntent > 0.05f ? deceleration : idleDeceleration);
+
         _velocity = Vector2.MoveTowards(_velocity, _desired, rate * dt);
+        if (_moveIntent <= 0.05f && _velocity.sqrMagnitude < 0.0025f && _desired.sqrMagnitude < 0.0025f)
+        {
+            _velocity = Vector2.zero;
+        }
     }
 
-    private void ApplyMovement(Vector2 position, float dt)
+    private void Move(Vector2 position, float dt, Vector2[] positions, int count, int selfIndex, int leaderIndex)
     {
         Vector2 delta = _velocity * dt;
         float dist = delta.magnitude;
@@ -363,39 +330,19 @@ public class Creep : MonoBehaviour
             Vector2 dir = delta / dist;
             int hits = body != null
                 ? body.Cast(dir, _obstacleFilter, _obstacleHits, dist + 0.02f)
-                : Physics2D.CircleCast(position, 0.22f, dir, _obstacleFilter, _obstacleHits, dist + 0.02f);
+                : Physics2D.CircleCast(position, bodyRadius, dir, _obstacleFilter, _obstacleHits, dist + 0.02f);
 
-            RaycastHit2D validHit = default;
-            bool hasValidHit = false;
             for (int i = 0; i < hits; i++)
             {
                 RaycastHit2D h = _obstacleHits[i];
-                if (h.collider == null) continue;
-                if (Vector2.Dot(dir, h.normal) < -0.001f)
-                {
-                    validHit = h;
-                    hasValidHit = true;
-                    break;
-                }
-            }
+                if (h.collider == null || Vector2.Dot(dir, h.normal) >= -0.001f) continue;
 
-            if (hasValidHit)
-            {
-                float safeDist = Mathf.Max(0f, validHit.distance - 0.005f);
-                Vector2 move = dir * safeDist;
+                Vector2 move = dir * Mathf.Max(0f, h.distance - 0.005f);
                 Vector2 remaining = delta - move;
-
-                float intoWall = Vector2.Dot(_velocity, validHit.normal);
-                if (intoWall < 0f)
-                {
-                    _velocity -= validHit.normal * intoWall;
-                }
-
-                float remInto = Vector2.Dot(remaining, validHit.normal);
-                if (remInto < 0f)
-                {
-                    remaining -= validHit.normal * remInto;
-                }
+                float into = Vector2.Dot(_velocity, h.normal);
+                if (into < 0f) _velocity -= h.normal * into;
+                float remInto = Vector2.Dot(remaining, h.normal);
+                if (remInto < 0f) remaining -= h.normal * remInto;
 
                 float remDist = remaining.magnitude;
                 if (remDist > 0.0001f)
@@ -403,50 +350,53 @@ public class Creep : MonoBehaviour
                     Vector2 remDir = remaining / remDist;
                     int slideHits = body != null
                         ? body.Cast(remDir, _obstacleFilter, _slideHits, remDist + 0.01f)
-                        : Physics2D.CircleCast(position + move, 0.22f, remDir, _obstacleFilter, _slideHits, remDist + 0.01f);
-
+                        : Physics2D.CircleCast(position + move, bodyRadius, remDir, _obstacleFilter, _slideHits, remDist + 0.01f);
                     float slideSafe = remDist;
                     for (int s = 0; s < slideHits; s++)
                     {
-                        RaycastHit2D sh = _slideHits[s];
-                        if (sh.collider == null) continue;
-                        if (Vector2.Dot(remDir, sh.normal) < -0.001f)
-                        {
-                            slideSafe = Mathf.Min(slideSafe, Mathf.Max(0f, sh.distance - 0.005f));
-                        }
+                        if (_slideHits[s].collider == null || Vector2.Dot(remDir, _slideHits[s].normal) >= -0.001f) continue;
+                        slideSafe = Mathf.Min(slideSafe, Mathf.Max(0f, _slideHits[s].distance - 0.005f));
                     }
                     move += remDir * slideSafe;
                 }
 
-                if (move.sqrMagnitude < 0.00001f)
-                {
-                    _velocity = Vector2.zero;
-                }
-
+                if (move.sqrMagnitude < 0.00001f) _velocity = Vector2.zero;
                 delta = move;
+                break;
             }
         }
 
         Vector2 next = position + delta;
+        if (!_isLeader) ResolveOverlap(ref next, positions, count, selfIndex, leaderIndex);
         if (body != null) body.MovePosition(next);
         else _transform.position = next;
+        if (_hasGroundMask && !IsOnGround(next)) _isGrounded = false;
+    }
 
-        if (_hasGroundMask && !IsOnGround(next))
+    private void ResolveOverlap(ref Vector2 position, Vector2[] positions, int count, int selfIndex, int leaderIndex)
+    {
+        if (positions == null) return;
+        float minDist = bodyRadius * 2f;
+        float minSqr = minDist * minDist;
+        for (int i = 0; i < count; i++)
         {
-            _isGrounded = false;
+            if (i == selfIndex || i == leaderIndex) continue;
+            Vector2 d = position - positions[i];
+            float sqr = d.sqrMagnitude;
+            if (sqr >= minSqr || sqr <= 0.000001f) continue;
+            float dist = Mathf.Sqrt(sqr);
+            position += d * (((minDist - dist) * 0.5f) / dist);
         }
     }
 
     private void ApplyWalkBob()
     {
-        float spd = _velocity.magnitude;
         float angle = _baseEuler.z;
+        float spd = _velocity.magnitude;
         if (spd >= 0.08f)
         {
-            float factor = Mathf.Clamp01(spd / maxSpeed);
-            angle += Mathf.Sin(Time.time * walkBobSpeed + _bobPhase) * walkBobAmplitude * factor;
+            angle += Mathf.Sin(Time.time * walkBobSpeed + _bobPhase) * walkBobAmplitude * Mathf.Clamp01(spd / maxSpeed);
         }
-
         if (body != null) body.rotation = angle;
         else _transform.localEulerAngles = new Vector3(_baseEuler.x, _baseEuler.y, angle);
     }
@@ -454,12 +404,16 @@ public class Creep : MonoBehaviour
     private void BeginFall()
     {
         if (_isFalling) return;
-
         _isFalling = true;
+        if (!_isDead)
+        {
+            _isDead = true;
+            SetLeader(false);
+            if (onDied != null) onDied.Invoke(this);
+        }
         _fallScale = _baseScale;
         _transform.localScale = _baseScale;
         _velocity = Vector2.zero;
-
         if (body != null)
         {
             body.linearVelocity = Vector2.zero;
@@ -467,11 +421,7 @@ public class Creep : MonoBehaviour
             body.rotation = _baseEuler.z;
             body.simulated = false;
         }
-        else
-        {
-            _transform.localEulerAngles = _baseEuler;
-        }
-
+        else _transform.localEulerAngles = _baseEuler;
         if (bodyCollider != null) bodyCollider.enabled = false;
     }
 
