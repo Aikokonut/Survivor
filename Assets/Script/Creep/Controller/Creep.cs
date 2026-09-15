@@ -24,15 +24,16 @@ public class Creep : MonoBehaviour
     [SerializeField] private float minFallScale = 0.05f;
     [SerializeField] private float idleSettleSpeed = 0.85f;
     [SerializeField] private float idleSlotMaxSpeed = 2.4f;
+    [SerializeField] private float idleArriveRadius = 0.55f;
     [SerializeField] private float bodyRadius = 0.22f;
-    [SerializeField] private float partingLaneWidth = 0.7f;
-    [SerializeField] private float partingWeight = 2.6f;
-    [SerializeField] private float leaderClearRadius = 0.7f;
-    [SerializeField] private float moveSeekWeight = 0.32f;
+    [SerializeField] private float partingLaneWidth = 0.4f;
+    [SerializeField] private float partingWeight = 1.2f;
+    [SerializeField] private float leaderClearRadius = 0.55f;
+    [SerializeField] private float moveSeekWeight = 0.48f;
     [SerializeField] private float moveTurnAccelScale = 1.55f;
     [SerializeField] private float leaderDriveScale = 0.97f;
     [SerializeField] private float followerBehindPull = 1.2f;
-    [SerializeField] private float followerBackBias = 0.45f;
+    [SerializeField] private float followerBackBias = 0.35f;
 
     private Transform _transform;
     private Vector2 _formationOffset;
@@ -49,6 +50,7 @@ public class Creep : MonoBehaviour
     private float _airTime;
     private float _bobPhase;
     private float _moveIntent;
+    private float _idleSpeedCap;
     private bool _isGrounded;
     private bool _isFalling;
     private bool _isDead;
@@ -151,10 +153,10 @@ public class Creep : MonoBehaviour
 
         _moveIntent = moveIntent;
         Vector2 position = _transform.position;
-        BuildDesired(position, groupTarget, flowForward, moveInput, formationScale, positions, count, selfIndex, separationRadius, separationWeight, leaderPosition, leaderIndex);
+        BuildDesired(position, groupTarget, flowForward, moveInput, formationScale, positions, count, selfIndex, separationRadius, separationWeight, leaderPosition);
         AvoidObstacles(position);
         IntegrateVelocity(dt);
-        Move(position, dt, positions, count, selfIndex, leaderIndex);
+        Move(position, dt, positions, count, selfIndex);
         if (positions != null && selfIndex >= 0 && selfIndex < count) positions[selfIndex] = _transform.position;
         ApplyWalkBob();
     }
@@ -182,37 +184,51 @@ public class Creep : MonoBehaviour
         int selfIndex,
         float sepRadius,
         float sepWeight,
-        Vector2 leaderPos,
-        int leaderIndex)
+        Vector2 leaderPos)
     {
         bool moving = _moveIntent > 0.05f;
 
         if (_isLeader)
         {
+            _idleSpeedCap = idleSlotMaxSpeed;
             _desired = moving ? moveInput * (maxSpeed * leaderDriveScale) : Vector2.zero;
             return;
         }
 
-        Vector2 sep = SoftSep(position, positions, count, selfIndex, sepRadius, sepWeight, leaderIndex);
+        Vector2 sep = SoftSep(position, positions, count, selfIndex, sepRadius, sepWeight);
 
         if (!moving)
         {
-            if (_velocity.sqrMagnitude > idleSettleSpeed * idleSettleSpeed)
+            Vector2 idleForward = flowForward.sqrMagnitude > 0.0001f ? flowForward.normalized : Vector2.up;
+            Vector2 toSlot = groupTarget + _formationOffset - position;
+            float distSqr = toSlot.sqrMagnitude;
+            float arriveSqr = idleArriveRadius * idleArriveRadius;
+            _idleSpeedCap = distSqr > arriveSqr ? maxSpeed : idleSlotMaxSpeed;
+
+            if (distSqr < 0.008f)
+            {
+                _desired = SidePush(position, leaderPos, idleForward, idleSlotMaxSpeed) + sep * 0.25f;
+                return;
+            }
+
+            if (distSqr <= arriveSqr && _velocity.sqrMagnitude > idleSettleSpeed * idleSettleSpeed)
             {
                 _desired = Vector2.zero;
                 return;
             }
 
-            Vector2 toSlot = groupTarget + _formationOffset - position;
-            if (toSlot.sqrMagnitude < 0.008f) { _desired = Vector2.zero; return; }
-            _desired = Vector2.ClampMagnitude(toSlot * (slotFollowWeight * 1.35f), idleSlotMaxSpeed) + sep * 0.25f;
+            _desired = Vector2.ClampMagnitude(toSlot * (slotFollowWeight * 1.35f), _idleSpeedCap)
+                + sep * 0.25f
+                + SidePush(position, leaderPos, idleForward, _idleSpeedCap);
             return;
         }
+
+        _idleSpeedCap = idleSlotMaxSpeed;
 
         Vector2 forward = flowForward.sqrMagnitude > 0.0001f ? flowForward.normalized : Vector2.up;
         Vector2 side = new Vector2(-forward.y, forward.x);
         float lat = Vector2.Dot(_formationOffset, side);
-        float alongOff = -Mathf.Abs(Vector2.Dot(_formationOffset, forward)) - followerBackBias;
+        float alongOff = Vector2.Dot(_formationOffset, forward) * 0.5f - followerBackBias;
         Vector2 slot = groupTarget + side * (lat * formationScale) + forward * (alongOff * formationScale);
 
         Vector2 drive = moveInput * maxSpeed;
@@ -234,6 +250,9 @@ public class Creep : MonoBehaviour
     private Vector2 SidePush(Vector2 position, Vector2 leaderPos, Vector2 forward, float personalMax)
     {
         Vector2 delta = position - leaderPos;
+        float sqr = delta.sqrMagnitude;
+        if (sqr <= 0.000001f) return Vector2.zero;
+
         Vector2 side = new Vector2(-forward.y, forward.x);
         float along = Vector2.Dot(delta, forward);
         float lat = Vector2.Dot(delta, side);
@@ -247,19 +266,24 @@ public class Creep : MonoBehaviour
         }
 
         float clearSqr = leaderClearRadius * leaderClearRadius;
-        if (delta.sqrMagnitude < clearSqr && delta.sqrMagnitude > 0.000001f)
+        if (sqr < clearSqr)
         {
-            float d = Mathf.Sqrt(delta.sqrMagnitude);
+            float d = Mathf.Sqrt(sqr);
             strength = Mathf.Max(strength, ((leaderClearRadius - d) / leaderClearRadius) * 2.2f * personalMax);
         }
 
         if (strength <= 0f) return Vector2.zero;
+
+        Vector2 away = delta / Mathf.Sqrt(sqr);
         float sign = lat >= 0f ? 1f : -1f;
         if (absLat < 0.04f) sign = Vector2.Dot(_formationOffset, side) >= 0f ? 1f : -1f;
-        return side * (sign * strength);
+        Vector2 dir = (away * 0.7f + side * (sign * 0.3f));
+        float dirMag = dir.magnitude;
+        if (dirMag <= 0.0001f) return away * strength;
+        return dir * (strength / dirMag);
     }
 
-    private Vector2 SoftSep(Vector2 position, Vector2[] positions, int count, int selfIndex, float radius, float weight, int leaderIndex)
+    private Vector2 SoftSep(Vector2 position, Vector2[] positions, int count, int selfIndex, float radius, float weight)
     {
         if (positions == null || count <= 0 || radius <= 0f) return Vector2.zero;
 
@@ -267,7 +291,7 @@ public class Creep : MonoBehaviour
         Vector2 push = Vector2.zero;
         for (int i = 0; i < count; i++)
         {
-            if (i == selfIndex || i == leaderIndex) continue;
+            if (i == selfIndex) continue;
             Vector2 d = position - positions[i];
             float sqr = d.sqrMagnitude;
             if (sqr <= 0.0001f || sqr >= sepSqr) continue;
@@ -306,7 +330,7 @@ public class Creep : MonoBehaviour
 
     private void IntegrateVelocity(float dt)
     {
-        float cap = _moveIntent > 0.05f ? maxSpeed * (_isLeader ? leaderDriveScale : 1f) : idleSlotMaxSpeed;
+        float cap = _moveIntent > 0.05f ? maxSpeed * (_isLeader ? leaderDriveScale : 1f) : _idleSpeedCap;
         _desired = Vector2.ClampMagnitude(_desired, cap);
 
         float rate = _desired.sqrMagnitude > _velocity.sqrMagnitude
@@ -320,7 +344,7 @@ public class Creep : MonoBehaviour
         }
     }
 
-    private void Move(Vector2 position, float dt, Vector2[] positions, int count, int selfIndex, int leaderIndex)
+    private void Move(Vector2 position, float dt, Vector2[] positions, int count, int selfIndex)
     {
         Vector2 delta = _velocity * dt;
         float dist = delta.magnitude;
@@ -367,20 +391,41 @@ public class Creep : MonoBehaviour
         }
 
         Vector2 next = position + delta;
-        if (!_isLeader) ResolveOverlap(ref next, positions, count, selfIndex, leaderIndex);
+        if (!_isLeader) ResolveOverlap(ref next, positions, count, selfIndex);
+
+        if (_hasObstacleMask)
+        {
+            Vector2 push = next - position;
+            float pushDist = push.magnitude;
+            if (pushDist > 0.0001f)
+            {
+                Vector2 dir = push / pushDist;
+                int hits = body != null
+                    ? body.Cast(dir, _obstacleFilter, _obstacleHits, pushDist + 0.02f)
+                    : Physics2D.CircleCast(position, bodyRadius, dir, _obstacleFilter, _obstacleHits, pushDist + 0.02f);
+                for (int i = 0; i < hits; i++)
+                {
+                    RaycastHit2D h = _obstacleHits[i];
+                    if (h.collider == null || Vector2.Dot(dir, h.normal) >= -0.001f) continue;
+                    next = position + dir * Mathf.Max(0f, h.distance - 0.005f);
+                    break;
+                }
+            }
+        }
+
         if (body != null) body.MovePosition(next);
         else _transform.position = next;
         if (_hasGroundMask && !IsOnGround(next)) _isGrounded = false;
     }
 
-    private void ResolveOverlap(ref Vector2 position, Vector2[] positions, int count, int selfIndex, int leaderIndex)
+    private void ResolveOverlap(ref Vector2 position, Vector2[] positions, int count, int selfIndex)
     {
         if (positions == null) return;
         float minDist = bodyRadius * 2f;
         float minSqr = minDist * minDist;
         for (int i = 0; i < count; i++)
         {
-            if (i == selfIndex || i == leaderIndex) continue;
+            if (i == selfIndex) continue;
             Vector2 d = position - positions[i];
             float sqr = d.sqrMagnitude;
             if (sqr >= minSqr || sqr <= 0.000001f) continue;
