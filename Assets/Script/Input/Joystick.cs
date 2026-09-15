@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
@@ -7,6 +8,7 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
 
     [SerializeField] private RectTransform background;
     [SerializeField] private RectTransform handle;
+    [SerializeField] private RectTransform touchArea;
     [SerializeField] private float handleRange = 1f;
     [SerializeField] private float deadZone;
     [SerializeField] private float smoothSpeed = 18f;
@@ -22,6 +24,9 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
     private InputChangedHandler _onInputChanged;
     private bool _isPressed;
     private bool _wasSending;
+    private TouchAreaRelay _touchAreaRelay;
+    private CanvasGroup _canvasGroup;
+    private bool _hideViaCanvasGroup;
 
     private void Awake()
     {
@@ -32,11 +37,22 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         _lastScreenPoint = Vector2.zero;
         _isPressed = false;
         _wasSending = false;
+        _hideViaCanvasGroup = false;
+
+        if (touchArea == null)
+        {
+            touchArea = _baseRect;
+        }
 
         if (background != null)
         {
             _radius.x = background.sizeDelta.x * 0.5f;
             _radius.y = background.sizeDelta.y * 0.5f;
+            _hideViaCanvasGroup = background.gameObject == gameObject;
+            if (!_hideViaCanvasGroup)
+            {
+                DisableRaycasts(background);
+            }
         }
 
         if (handle != null)
@@ -44,7 +60,21 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             handle.anchoredPosition = Vector2.zero;
         }
 
+        if (_hideViaCanvasGroup)
+        {
+            _canvasGroup = gameObject.GetComponent<CanvasGroup>();
+            if (_canvasGroup == null)
+            {
+                _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+
+            _canvasGroup.blocksRaycasts = true;
+            _canvasGroup.interactable = true;
+        }
+
         ResolveEventCamera();
+        SetupTouchAreaRelay();
+        SetVisible(false);
     }
 
     private void Update()
@@ -70,7 +100,7 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             _smoothedInput.y = 0f;
         }
 
-        if (handle != null)
+        if (handle != null && IsVisualVisible())
         {
             handle.anchoredPosition = new Vector2(
                 _smoothedInput.x * _radius.x * handleRange,
@@ -112,22 +142,172 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        _isPressed = true;
-        _lastScreenPoint = eventData.position;
-        ApplyScreenPoint(_lastScreenPoint);
+        HandlePointerDown(eventData);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        _lastScreenPoint = eventData.position;
-        ApplyScreenPoint(_lastScreenPoint);
+        HandleDrag(eventData);
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        HandlePointerUp(eventData);
+    }
+
+    private void HandlePointerDown(PointerEventData eventData)
+    {
+        if (!IsInsideTouchArea(eventData.position))
+        {
+            return;
+        }
+
+        _isPressed = true;
+        _lastScreenPoint = eventData.position;
+        PositionAtScreenPoint(_lastScreenPoint);
+        SetVisible(true);
+        ApplyScreenPoint(_lastScreenPoint);
+    }
+
+    private void HandleDrag(PointerEventData eventData)
+    {
+        if (!_isPressed)
+        {
+            return;
+        }
+
+        _lastScreenPoint = eventData.position;
+        ApplyScreenPoint(_lastScreenPoint);
+    }
+
+    private void HandlePointerUp(PointerEventData eventData)
+    {
+        if (!_isPressed)
+        {
+            return;
+        }
+
         _isPressed = false;
         _rawInput.x = 0f;
         _rawInput.y = 0f;
+
+        if (handle != null)
+        {
+            handle.anchoredPosition = Vector2.zero;
+        }
+
+        SetVisible(false);
+    }
+
+    private void SetupTouchAreaRelay()
+    {
+        if (touchArea == null)
+        {
+            return;
+        }
+
+        Graphic graphic = touchArea.GetComponent<Graphic>();
+        if (graphic == null)
+        {
+            Image image = touchArea.gameObject.AddComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0f);
+            graphic = image;
+        }
+
+        graphic.raycastTarget = true;
+
+        if (touchArea.gameObject == gameObject)
+        {
+            return;
+        }
+
+        _touchAreaRelay = touchArea.GetComponent<TouchAreaRelay>();
+        if (_touchAreaRelay == null)
+        {
+            _touchAreaRelay = touchArea.gameObject.AddComponent<TouchAreaRelay>();
+        }
+
+        _touchAreaRelay.Bind(this);
+    }
+
+    private void DisableRaycasts(RectTransform root)
+    {
+        Graphic[] graphics = root.GetComponentsInChildren<Graphic>(true);
+        int i = 0;
+        int count = graphics.Length;
+        while (i < count)
+        {
+            graphics[i].raycastTarget = false;
+            i++;
+        }
+    }
+
+    private void PositionAtScreenPoint(Vector2 screenPoint)
+    {
+        if (background == null)
+        {
+            return;
+        }
+
+        RectTransform parent = background.parent as RectTransform;
+        if (parent == null)
+        {
+            return;
+        }
+
+        Vector2 localPoint;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screenPoint, _eventCamera, out localPoint))
+        {
+            return;
+        }
+
+        background.anchoredPosition = localPoint;
+    }
+
+    private bool IsInsideTouchArea(Vector2 screenPoint)
+    {
+        if (touchArea == null)
+        {
+            return true;
+        }
+
+        Vector2 localPoint;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(touchArea, screenPoint, _eventCamera, out localPoint))
+        {
+            return false;
+        }
+
+        return touchArea.rect.Contains(localPoint);
+    }
+
+    private bool IsVisualVisible()
+    {
+        if (_hideViaCanvasGroup)
+        {
+            return _canvasGroup != null && _canvasGroup.alpha > 0.001f;
+        }
+
+        return background != null && background.gameObject.activeSelf;
+    }
+
+    private void SetVisible(bool visible)
+    {
+        if (background == null)
+        {
+            return;
+        }
+
+        if (_hideViaCanvasGroup)
+        {
+            if (_canvasGroup != null)
+            {
+                _canvasGroup.alpha = visible ? 1f : 0f;
+            }
+
+            return;
+        }
+
+        background.gameObject.SetActive(visible);
     }
 
     private void ApplyScreenPoint(Vector2 screenPoint)
@@ -178,5 +358,39 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         }
 
         _eventCamera = _canvas.worldCamera;
+    }
+
+    private sealed class TouchAreaRelay : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
+    {
+        private Joystick _owner;
+
+        public void Bind(Joystick owner)
+        {
+            _owner = owner;
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (_owner != null)
+            {
+                _owner.HandlePointerDown(eventData);
+            }
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (_owner != null)
+            {
+                _owner.HandleDrag(eventData);
+            }
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (_owner != null)
+            {
+                _owner.HandlePointerUp(eventData);
+            }
+        }
     }
 }
